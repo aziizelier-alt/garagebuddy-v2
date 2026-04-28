@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { useGarage } from '@/hooks/useGarage';
 import Modal from '@/components/Modal';
 
 export default function VehiclesPage() {
+  const { garageId } = useGarage();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,10 +16,12 @@ export default function VehiclesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchVehicles = async () => {
+    if (!garageId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('vehicles')
       .select('*, customers(name)')
+      .eq('garage_id', garageId)
       .order('created_at', { ascending: false });
       
     if (!error && data) setVehicles(data);
@@ -25,47 +29,42 @@ export default function VehiclesPage() {
   };
 
   const fetchCustomersForDropdown = async () => {
-    const { data } = await supabase.from('customers').select('id, name').order('name');
+    if (!garageId) return;
+    const { data } = await supabase.from('customers').select('id, name').eq('garage_id', garageId).order('name');
     if (data) setCustomers(data);
   };
 
   useEffect(() => {
-    fetchVehicles();
-    fetchCustomersForDropdown();
-  }, []);
+    if (garageId) {
+      fetchVehicles();
+      fetchCustomersForDropdown();
+    }
+  }, [garageId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.customer_id) {
+    if (!formData.customer_id || !garageId) {
       alert("Please select an owner for this vehicle.");
       return;
     }
     
     setSubmitting(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    if (!userId) return;
+    const { error } = await supabase.from('vehicles').insert({
+      garage_id: garageId,
+      customer_id: formData.customer_id,
+      make: formData.make,
+      model: formData.model,
+      year: formData.year ? parseInt(formData.year) : null,
+      vin: formData.vin
+    });
 
-    const { data: userRecord } = await supabase.from('users').select('garage_id').eq('id', userId).single();
-
-    if (userRecord?.garage_id) {
-      const { error } = await supabase.from('vehicles').insert({
-        garage_id: userRecord.garage_id,
-        customer_id: formData.customer_id,
-        make: formData.make,
-        model: formData.model,
-        year: formData.year ? parseInt(formData.year) : null,
-        vin: formData.vin
-      });
-
-      if (!error) {
-        setIsModalOpen(false);
-        setFormData({ customer_id: '', make: '', model: '', year: '', vin: '' });
-        fetchVehicles();
-      } else {
-        alert('Error adding vehicle: ' + error.message);
-      }
+    if (!error) {
+      setIsModalOpen(false);
+      setFormData({ customer_id: '', make: '', model: '', year: '', vin: '' });
+      fetchVehicles();
+    } else {
+      alert('Error adding vehicle: ' + error.message);
     }
     setSubmitting(false);
   };

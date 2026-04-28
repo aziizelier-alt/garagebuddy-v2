@@ -1,0 +1,21 @@
+{
+  "name": "garagebuddy-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "VARR - Automotive SaaS Platform Monorepo",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace=packages/admin-app",
+    "dev:engineer": "npm run dev --workspace=packages/engineer-app",
+    "dev:customer": "npm run dev --workspace=packages/customer-app",
+    "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}

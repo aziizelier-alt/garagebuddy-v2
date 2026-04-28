@@ -1,13 +1,17 @@
 'use client';
 
+import React from 'react';
+import { Card } from './ui/Card';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+
 type JobProps = {
   job: {
     id: string;
     status: string;
     description: string;
     assigned_mechanic_id: string | null;
-    vehicles?: { make: string; model: string } | null;
-    customers?: { name: string } | null;
+    vehicles?: { make: string; model: string, customers?: { name: string } | null } | null;
   };
   onAddPart?: (jobId: string) => void;
 };
@@ -16,36 +20,59 @@ export default function JobCard({ job, onAddPart }: JobProps) {
   const shortId = job.id.split('-')[0].toUpperCase();
   
   return (
-    <div className="job-card">
-      <div className="job-id">#{shortId}</div>
-      <div className="job-desc">{job.description || 'No description provided'}</div>
-      
-      <div className="job-meta">
-        <div>
-          <svg style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          {job.vehicles?.make || 'Unknown'} {job.vehicles?.model || 'Vehicle'}
-        </div>
-      </div>
-      
-      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {job.assigned_mechanic_id ? (
-            <><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'inline-block' }}></div> Assigned</>
-          ) : (
-            <><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--border-color)', display: 'inline-block' }}></div> Unassigned</>
-          )}
-        </div>
-        {onAddPart && (job.status === 'in_progress' || job.status === 'waiting_parts') && (
-          <button 
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onAddPart(job.id); }} 
-            className="btn-secondary" 
-            style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', border: 'none' }}
-          >
-            + Part
-          </button>
+    <Card 
+      padding="1.25rem" 
+      style={{ 
+        marginBottom: '1rem', 
+        cursor: 'grab', 
+        transition: 'transform 0.2s, box-shadow 0.2s',
+        border: '1px solid var(--border-color)',
+        background: 'rgba(255, 255, 255, 0.02)'
+      }}
+      className="job-card-item"
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>#{shortId}</span>
+        {job.assigned_mechanic_id ? (
+          <Badge variant="info" style={{ fontSize: '0.6rem', padding: '2px 6px' }}>Assigned</Badge>
+        ) : (
+          <Badge variant="warning" style={{ fontSize: '0.6rem', padding: '2px 6px' }}>Pending</Badge>
         )}
       </div>
-    </div>
+
+      <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+        {job.vehicles?.make} {job.vehicles?.model}
+      </div>
+      
+      <div style={{ 
+        fontSize: '0.8125rem', 
+        color: 'var(--text-secondary)', 
+        lineHeight: 1.5,
+        display: '-webkit-box',
+        WebkitLineClamp: 3,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        marginBottom: '1rem'
+      }}>
+        {job.description || 'No description provided'}
+      </div>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+           {job.vehicles?.customers?.name || 'Walk-in'}
+        </div>
+        {onAddPart && (job.status === 'in_progress' || job.status === 'waiting_parts') && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            style={{ padding: '0.25rem 0.5rem', height: 'auto', fontSize: '0.7rem' }}
+            onClick={(e) => { e.stopPropagation(); onAddPart(job.id); }}
+          >
+            + Part
+          </Button>
+        )}
+      </div>
+    </Card>
   );
 }

@@ -8,9 +8,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="app-layout">
+    <div className="app-container">
       <Navigation />
-      <main className="app-main">
+      <main className="main-content">
         {children}
       </main>
     </div>

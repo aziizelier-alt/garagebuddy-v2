@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import Modal from '@/components/Modal';
+import { useUser } from '@/hooks/useUser';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
+import { Badge } from '@/components/ui/Badge';
+import { toast } from '@/components/ui/Toast';
 
 export default function PartsPage() {
+  const { garageId, loading: userLoading } = useUser();
   const [parts, setParts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -13,10 +19,12 @@ export default function PartsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchParts = async () => {
+    if (!garageId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('parts')
       .select('*')
+      .eq('garage_id', garageId)
       .order('name', { ascending: true });
       
     if (!error && data) setParts(data);
@@ -24,94 +32,95 @@ export default function PartsPage() {
   };
 
   useEffect(() => {
-    fetchParts();
-  }, []);
+    if (!userLoading && garageId) fetchParts();
+  }, [garageId, userLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!garageId) return;
     setSubmitting(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    if (!userId) return;
+    const { error } = await supabase.from('parts').insert({
+      garage_id: garageId,
+      name: formData.name,
+      price: parseFloat(formData.price),
+      stock: parseInt(formData.stock) || 0
+    });
 
-    const { data: userRecord } = await supabase.from('users').select('garage_id').eq('id', userId).single();
-
-    if (userRecord?.garage_id) {
-      const { error } = await supabase.from('parts').insert({
-        garage_id: userRecord.garage_id,
-        name: formData.name,
-        price: parseFloat(formData.price),
-        stock: parseInt(formData.stock) || 0
-      });
-
-      if (!error) {
-        setIsModalOpen(false);
-        setFormData({ name: '', price: '', stock: '' });
-        fetchParts();
-      } else {
-        alert('Error adding part: ' + error.message);
-      }
+    if (!error) {
+      setIsModalOpen(false);
+      setFormData({ name: '', price: '', stock: '' });
+      fetchParts();
+      toast.success('Part added to inventory');
+    } else {
+      toast.error('Error adding part: ' + error.message);
     }
     setSubmitting(false);
   };
 
   return (
     <div className="animate-fade-in">
-      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 className="dashboard-title" style={{ marginBottom: '0.5rem' }}>Parts Inventory</h1>
+          <h1 className="dashboard-title" style={{ marginBottom: '0.5rem' }}>Inventory</h1>
           <p style={{ color: 'var(--text-secondary)' }}>Manage physical stock and pricing for components.</p>
         </div>
-        <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setIsModalOpen(true)}>
-          + Add Part
-        </button>
+        <Button 
+          onClick={() => setIsModalOpen(true)}
+          leftIcon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>}
+        >
+          Add Part
+        </Button>
       </div>
 
-      <div className="data-table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Part Name</th>
-              <th>Unit Price</th>
-              <th>In Stock</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      <Card padding="0">
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={4} className="text-center" style={{ padding: '2rem' }}>Loading parts...</td>
+                <th>Part Name</th>
+                <th>Unit Price</th>
+                <th>In Stock</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ) : parts.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-center" style={{ padding: '2rem' }}>No parts in inventory.</td>
-              </tr>
-            ) : (
-              parts.map(p => (
-                <tr key={p.id}>
-                  <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{p.name}</td>
-                  <td>${Number(p.price).toFixed(2)}</td>
-                  <td>
-                    <span style={{ 
-                      padding: '2px 8px', 
-                      borderRadius: '12px', 
-                      fontSize: '0.75rem',
-                      background: p.stock > 5 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      color: p.stock > 5 ? 'var(--success)' : 'var(--danger)'
-                    }}>
-                      {p.stock} units
-                    </span>
-                  </td>
-                  <td>
-                    <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', border: 'none' }}>Edit</button>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="text-center" style={{ padding: '3rem', color: 'var(--text-tertiary)' }}>Loading inventory...</td>
+                </tr>
+              ) : parts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center" style={{ padding: '4rem', color: 'var(--text-tertiary)' }}>
+                    <div style={{ marginBottom: '1rem', opacity: 0.5 }}>
+                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path></svg>
+                    </div>
+                    <div style={{ fontSize: '1.125rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Empty inventory</div>
+                    <p>Start adding parts to track your garage's stock levels.</p>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                parts.map(p => (
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>£{Number(p.price).toFixed(2)}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{p.stock} units</td>
+                    <td>
+                      <Badge variant={p.stock > 10 ? 'success' : p.stock > 0 ? 'warning' : 'danger'}>
+                        {p.stock > 10 ? 'In Stock' : p.stock > 0 ? 'Low Stock' : 'Out of Stock'}
+                      </Badge>
+                    </td>
+                    <td>
+                      <Button variant="ghost" size="sm">Edit</Button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Inventory Part">
         <form onSubmit={handleSubmit}>
@@ -127,9 +136,9 @@ export default function PartsPage() {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group mb-4">
-              <label className="form-label">Unit Price ($) *</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="form-group">
+              <label className="form-label">Unit Price (£) *</label>
               <input 
                 type="number" 
                 step="0.01"
@@ -140,7 +149,7 @@ export default function PartsPage() {
                 onChange={e => setFormData({...formData, price: e.target.value})}
               />
             </div>
-            <div className="form-group mb-4">
+            <div className="form-group">
               <label className="form-label">Initial Stock *</label>
               <input 
                 type="number" 
@@ -153,11 +162,9 @@ export default function PartsPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting} style={{ width: 'auto' }}>
-              {submitting ? 'Saving...' : 'Save Part'}
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
+            <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={submitting}>Save to Inventory</Button>
           </div>
         </form>
       </Modal>

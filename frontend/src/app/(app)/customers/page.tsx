@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import Modal from '@/components/Modal';
+import { useUser } from '@/hooks/useUser';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
+import { toast } from '@/components/ui/Toast';
 
 export default function CustomersPage() {
+  const { garageId, loading: userLoading } = useUser();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,10 +17,12 @@ export default function CustomersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchCustomers = async () => {
+    if (!garageId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('customers')
       .select('*')
+      .eq('garage_id', garageId)
       .order('created_at', { ascending: false });
       
     if (!error && data) setCustomers(data);
@@ -23,92 +30,91 @@ export default function CustomersPage() {
   };
 
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    if (!userLoading && garageId) fetchCustomers();
+  }, [garageId, userLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!garageId) return;
     setSubmitting(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    const { error } = await supabase.from('customers').insert({
+      garage_id: garageId,
+      name: formData.name,
+      phone: formData.phone,
+      email: formData.email
+    });
 
-    if (!userId) return;
-
-    // Get the garage_id from the users table
-    const { data: userRecord } = await supabase
-      .from('users')
-      .select('garage_id')
-      .eq('id', userId)
-      .single();
-
-    if (userRecord?.garage_id) {
-      const { error } = await supabase.from('customers').insert({
-        garage_id: userRecord.garage_id,
-        name: formData.name,
-        phone: formData.phone,
-        email: formData.email
-      });
-
-      if (!error) {
-        setIsModalOpen(false);
-        setFormData({ name: '', phone: '', email: '' });
-        fetchCustomers();
-      } else {
-        alert('Error adding customer: ' + error.message);
-      }
+    if (!error) {
+      setIsModalOpen(false);
+      setFormData({ name: '', phone: '', email: '' });
+      fetchCustomers();
+      toast.success('Customer added successfully');
+    } else {
+      toast.error('Error adding customer: ' + error.message);
     }
     setSubmitting(false);
   };
 
   return (
     <div className="animate-fade-in">
-      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 className="dashboard-title" style={{ marginBottom: '0.5rem' }}>Customers</h1>
           <p style={{ color: 'var(--text-secondary)' }}>Manage your garage's customer base.</p>
         </div>
-        <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setIsModalOpen(true)}>
-          + Add Customer
-        </button>
+        <Button 
+          onClick={() => setIsModalOpen(true)}
+          leftIcon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>}
+        >
+          Add Customer
+        </Button>
       </div>
 
-      <div className="data-table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Email</th>
-              <th>Added On</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      <Card padding="0">
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="text-center" style={{ padding: '2rem' }}>Loading customers...</td>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Added On</th>
+                <th>Actions</th>
               </tr>
-            ) : customers.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="text-center" style={{ padding: '2rem' }}>No customers found. Add your first customer!</td>
-              </tr>
-            ) : (
-              customers.map(c => (
-                <tr key={c.id}>
-                  <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{c.name}</td>
-                  <td>{c.phone || '—'}</td>
-                  <td>{c.email || '—'}</td>
-                  <td>{new Date(c.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', border: 'none' }}>Edit</button>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="text-center" style={{ padding: '3rem', color: 'var(--text-tertiary)' }}>Loading customers...</td>
+                </tr>
+              ) : customers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center" style={{ padding: '4rem', color: 'var(--text-tertiary)' }}>
+                    <div style={{ marginBottom: '1rem', opacity: 0.5 }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+                    </div>
+                    <div style={{ fontSize: '1.125rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>No customers yet</div>
+                    <p>Start by adding your first customer to the workspace.</p>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                customers.map(c => (
+                  <tr key={c.id}>
+                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{c.phone || '—'}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
+                    <td style={{ color: 'var(--text-tertiary)' }}>{new Date(c.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <Button variant="ghost" size="sm">Edit</Button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Customer">
         <form onSubmit={handleSubmit}>
@@ -118,6 +124,7 @@ export default function CustomersPage() {
               type="text" 
               className="form-input" 
               required 
+              placeholder="e.g. John Doe"
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
             />
@@ -127,24 +134,24 @@ export default function CustomersPage() {
             <input 
               type="tel" 
               className="form-input" 
+              placeholder="e.g. 07700 900000"
               value={formData.phone}
               onChange={e => setFormData({...formData, phone: e.target.value})}
             />
           </div>
-          <div className="form-group mb-4">
+          <div className="form-group">
             <label className="form-label">Email Address</label>
             <input 
               type="email" 
               className="form-input" 
+              placeholder="e.g. john@example.com"
               value={formData.email}
               onChange={e => setFormData({...formData, email: e.target.value})}
             />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting} style={{ width: 'auto' }}>
-              {submitting ? 'Saving...' : 'Save Customer'}
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
+            <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={submitting}>Save Customer</Button>
           </div>
         </form>
       </Modal>

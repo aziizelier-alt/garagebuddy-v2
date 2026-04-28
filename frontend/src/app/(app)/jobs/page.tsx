@@ -2,18 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { useUser } from '@/hooks/useUser';
 import JobCard from '@/components/JobCard';
-import Modal from '@/components/Modal';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
+import { toast } from '@/components/ui/Toast';
 
 export default function JobBoard() {
+  const { garageId, userRole, userId, loading: userLoading } = useUser();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [mechanics, setMechanics] = useState<any[]>([]);
   
-  const [userRole, setUserRole] = useState('mechanic');
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ vehicle_id: '', description: '', assigned_mechanic_id: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -25,45 +27,42 @@ export default function JobBoard() {
   const [parts, setParts] = useState<any[]>([]);
 
   const fetchJobs = async () => {
+    if (!garageId) return;
     const { data, error } = await supabase
       .from('jobs')
-      .select('*, vehicles(make, model), customers(name)');
+      .select('*, vehicles(make, model, customers(name))')
+      .eq('garage_id', garageId);
       
     if (!error && data) setJobs(data);
     setLoading(false);
   };
 
   const fetchDropdownData = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    if (userId) {
-      setCurrentUserId(userId);
-      const { data: userDoc } = await supabase.from('users').select('role').eq('id', userId).single();
-      if (userDoc) setUserRole(userDoc.role);
-    }
+    if (!garageId) return;
 
-    const { data: vData } = await supabase.from('vehicles').select('id, make, model, customers(name)');
+    const { data: vData } = await supabase.from('vehicles').select('id, make, model, customers(name)').eq('garage_id', garageId);
     if (vData) setVehicles(vData);
 
-    const { data: mData } = await supabase.from('users').select('id, full_name').eq('role', 'mechanic');
+    const { data: mData } = await supabase.from('users').select('id, full_name').eq('garage_id', garageId).eq('role', 'mechanic');
     if (mData) setMechanics(mData);
 
-    const { data: pData } = await supabase.from('parts').select('id, name, price, stock').gt('stock', 0);
+    const { data: pData } = await supabase.from('parts').select('id, name, price, stock').eq('garage_id', garageId).gt('stock', 0);
     if (pData) setParts(pData);
   };
 
   useEffect(() => {
-    fetchJobs();
-    fetchDropdownData();
+    if (!userLoading && garageId) {
+      fetchJobs();
+      fetchDropdownData();
 
-    // Subscribe to realtime changes
-    const channel = supabase.channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => { fetchJobs(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parts' }, () => { fetchDropdownData(); })
-      .subscribe();
+      const channel = supabase.channel('schema-db-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs', filter: `garage_id=eq.${garageId}` }, () => { fetchJobs(); })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'parts', filter: `garage_id=eq.${garageId}` }, () => { fetchDropdownData(); })
+        .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+      return () => { supabase.removeChannel(channel); };
+    }
+  }, [garageId, userLoading]);
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('jobId', id);
@@ -76,46 +75,48 @@ export default function JobBoard() {
     const jobId = e.dataTransfer.getData('jobId');
     if (!jobId) return;
 
+    // Optimistic update
     setJobs(jobs.map(j => j.id === jobId ? { ...j, status } : j));
-    await supabase.from('jobs').update({ status }).eq('id', jobId);
+    
+    const { error } = await supabase.from('jobs').update({ status }).eq('id', jobId);
+    if (error) {
+      toast.error('Failed to update job status');
+      fetchJobs(); // Revert
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.vehicle_id) { alert("Please select a vehicle."); return; }
+    if (!formData.vehicle_id || !garageId || !userId) { toast.error("Please select a vehicle."); return; }
     
     setSubmitting(true);
-    if (!currentUserId) return;
+    const assignedId = userRole === 'admin' ? (formData.assigned_mechanic_id || null) : userId;
 
-    const { data: userRecord } = await supabase.from('users').select('garage_id').eq('id', currentUserId).single();
+    const { error } = await supabase.from('jobs').insert({
+      garage_id: garageId,
+      vehicle_id: formData.vehicle_id,
+      description: formData.description,
+      assigned_mechanic_id: assignedId,
+      status: 'pending'
+    });
 
-    if (userRecord?.garage_id) {
-      // If user is admin, use form selection. If mechanic, automatically assign to themselves
-      const assignedId = userRole === 'admin' ? (formData.assigned_mechanic_id || null) : currentUserId;
+    if (!error) {
+      if (assignedId && assignedId !== userId) {
+        await supabase.from('notifications').insert({
+          garage_id: garageId,
+          user_id: assignedId,
+          message: `You have been assigned a new repair job.`
+        });
+      }
 
-      const { error } = await supabase.from('jobs').insert({
-        garage_id: userRecord.garage_id,
-        vehicle_id: formData.vehicle_id,
-        description: formData.description,
-        assigned_mechanic_id: assignedId,
-        status: 'pending'
-      });
-
-      if (!error) {
-        // Send a notification if assigned to someone else
-        if (assignedId && assignedId !== currentUserId) {
-          await supabase.from('notifications').insert({
-            garage_id: userRecord.garage_id,
-            user_id: assignedId,
-            message: `You have been assigned a new repair job by an admin.`
-          });
-        }
-
-        setIsModalOpen(false);
-        setFormData({ vehicle_id: '', description: '', assigned_mechanic_id: '' });
-        fetchJobs();
-      } else { alert('Error adding job: ' + error.message); }
+      setIsModalOpen(false);
+      setFormData({ vehicle_id: '', description: '', assigned_mechanic_id: '' });
+      fetchJobs();
+      toast.success('Job order created successfully');
+    } else { 
+      toast.error('Error adding job: ' + error.message); 
     }
+    
     setSubmitting(false);
   };
 
@@ -139,8 +140,9 @@ export default function JobBoard() {
       }
       setIsPartModalOpen(false);
       setPartFormData({ part_id: '', quantity: '1' });
+      toast.success('Part added to job');
     } else {
-      alert('Error adding part: ' + error.message);
+      toast.error('Error adding part: ' + error.message);
     }
     setPartSubmitting(false);
   };
@@ -153,36 +155,52 @@ export default function JobBoard() {
   ];
 
   return (
-    <div className="animate-fade-in" style={{ height: 'calc(100vh - 4rem)', display: 'flex', flexDirection: 'column' }}>
-      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+    <div className="animate-fade-in" style={{ height: 'calc(100vh - 8rem)', display: 'flex', flexDirection: 'column' }}>
+      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 className="dashboard-title" style={{ marginBottom: '0.5rem' }}>Job Board</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Drag and drop repair jobs to update their status.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Workflow management for your workshop.</p>
         </div>
-        <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setIsModalOpen(true)}>
-          + New Job Order
-        </button>
+        <Button 
+          onClick={() => setIsModalOpen(true)}
+          leftIcon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>}
+        >
+          New Job Order
+        </Button>
       </div>
 
-      <div className="kanban-board">
+      <div className="kanban-board" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', flex: 1, minHeight: 0 }}>
         {columns.map(col => (
-          <div key={col.id} className="kanban-column" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)}>
-            <div className="kanban-column-header">
-              {col.title}
-              <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px' }}>
+          <div 
+            key={col.id} 
+            className="kanban-column" 
+            onDragOver={handleDragOver} 
+            onDrop={(e) => handleDrop(e, col.id)}
+            style={{ 
+              background: 'rgba(255,255,255,0.02)', 
+              borderRadius: 'var(--radius-lg)', 
+              display: 'flex', 
+              flexDirection: 'column',
+              border: '1px solid var(--border-color)',
+              minHeight: 0
+            }}
+          >
+            <div className="kanban-column-header" style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.title}</span>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-primary)', background: 'rgba(59, 130, 246, 0.1)', padding: '2px 10px', borderRadius: '12px' }}>
                 {jobs.filter(j => j.status === col.id).length}
               </span>
             </div>
             
-            <div className="kanban-column-body">
+            <div className="kanban-column-body" style={{ padding: '1rem', overflowY: 'auto', flex: 1 }}>
               {jobs.filter(j => j.status === col.id).map(job => (
-                <div key={job.id} draggable onDragStart={(e) => handleDragStart(e, job.id)} style={{ cursor: 'grab' }}>
+                <div key={job.id} draggable onDragStart={(e) => handleDragStart(e, job.id)}>
                   <JobCard job={job} onAddPart={(id) => { setSelectedJobId(id); setIsPartModalOpen(true); }} />
                 </div>
               ))}
               {jobs.filter(j => j.status === col.id).length === 0 && (
-                <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-tertiary)', fontSize: '0.875rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                  Drop jobs here
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-tertiary)', fontSize: '0.8125rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', opacity: 0.5 }}>
+                  Drag jobs here
                 </div>
               )}
             </div>
@@ -203,7 +221,7 @@ export default function JobBoard() {
               <option value="" disabled>Select a vehicle...</option>
               {vehicles.map(v => (
                 <option key={v.id} value={v.id}>
-                  {v.make} {v.model} ({v.customers?.name})
+                  {v.make} {v.model} — {v.customers?.name}
                 </option>
               ))}
             </select>
@@ -215,14 +233,14 @@ export default function JobBoard() {
               className="form-input" 
               required 
               rows={4}
-              placeholder="e.g. Customer complains about a rattling noise..."
+              placeholder="Describe the issue or service needed..."
               value={formData.description}
               onChange={e => setFormData({...formData, description: e.target.value})}
             ></textarea>
           </div>
 
           {userRole === 'admin' && (
-            <div className="form-group mb-4">
+            <div className="form-group">
               <label className="form-label">Assign Mechanic</label>
               <select 
                 className="form-input" 
@@ -237,11 +255,9 @@ export default function JobBoard() {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting || vehicles.length === 0} style={{ width: 'auto' }}>
-              {submitting ? 'Creating...' : 'Create Job'}
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
+            <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={submitting} disabled={vehicles.length === 0}>Create Job Order</Button>
           </div>
         </form>
       </Modal>
@@ -252,16 +268,16 @@ export default function JobBoard() {
             <label className="form-label">Select Part *</label>
             <select className="form-input" required value={partFormData.part_id} onChange={e => setPartFormData({...partFormData, part_id: e.target.value})}>
               <option value="" disabled>Choose from inventory...</option>
-              {parts.map(p => (<option key={p.id} value={p.id}>{p.name} - ${p.price} ({p.stock} in stock)</option>))}
+              {parts.map(p => (<option key={p.id} value={p.id}>{p.name} — £{p.price} ({p.stock} in stock)</option>))}
             </select>
           </div>
-          <div className="form-group mb-4">
+          <div className="form-group">
             <label className="form-label">Quantity</label>
             <input type="number" className="form-input" required min="1" value={partFormData.quantity} onChange={e => setPartFormData({...partFormData, quantity: e.target.value})} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsPartModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={partSubmitting || parts.length === 0} style={{ width: 'auto' }}>{partSubmitting ? 'Adding...' : 'Add Part'}</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
+            <Button variant="secondary" type="button" onClick={() => setIsPartModalOpen(false)}>Cancel</Button>
+            <Button type="submit" isLoading={partSubmitting} disabled={parts.length === 0}>Add to Job</Button>
           </div>
         </form>
       </Modal>

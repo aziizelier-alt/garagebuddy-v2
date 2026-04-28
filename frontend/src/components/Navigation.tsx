@@ -1,138 +1,149 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
+import { useUser } from '@/hooks/useUser';
 
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
-  const [userInitial, setUserInitial] = useState('U');
-  const [userRole, setUserRole] = useState('mechanic');
+  const { userRole, userId, garageId } = useUser();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
-    async function getUserData() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUserInitial(session.user.email?.charAt(0).toUpperCase() || 'U');
+    if (userId && garageId) {
+      fetchNotifications(userId, garageId);
+
+      const channel = supabase.channel('notif-changes')
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notifications',
+          filter: `garage_id=eq.${garageId}`
+        }, () => {
+          fetchNotifications(userId, garageId);
+        })
+        .subscribe();
         
-        const { data: userDoc } = await supabase.from('users').select('role').eq('id', session.user.id).single();
-        if (userDoc) setUserRole(userDoc.role);
-
-        fetchNotifications(session.user.id);
-      } else {
-        router.push('/');
-      }
+      return () => { supabase.removeChannel(channel); };
     }
-    getUserData();
+  }, [userId, garageId]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') router.push('/');
-    });
-
-    const channel = supabase.channel('schema-db-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) fetchNotifications(session.user.id);
-        });
-      })
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
-
-  const fetchNotifications = async (userId: string) => {
+  const fetchNotifications = async (uId: string, gId: string) => {
     const { data } = await supabase
       .from('notifications')
       .select('*')
-      .or(`user_id.eq.${userId},user_id.is.null`)
+      .eq('garage_id', gId)
+      .or(`user_id.eq.${uId},user_id.is.null`)
       .order('created_at', { ascending: false })
       .limit(5);
     
     if (data) setNotifications(data);
   };
 
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     await supabase.auth.signOut();
+    router.push('/');
   };
 
-  const navItems = [
-    { name: 'Overview', href: '/dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10', roles: ['admin', 'mechanic'] },
-    { name: 'Job Board', href: '/jobs', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', roles: ['admin', 'mechanic'] },
-    { name: 'Customers', href: '/customers', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 7a4 4 0 100-8 4 4 0 000 8z', roles: ['admin', 'mechanic'] },
-    { name: 'Vehicles', href: '/vehicles', icon: 'M14 16H9m10 0h3v-3.15a1 1 0 00-.84-.99L16 11l-2.7-3.6a1 1 0 00-.8-.4H8.5a1 1 0 00-.8.4L5 11l-5.16.86a1 1 0 00-.84.99V16h3m10 0a2 2 0 11-4 0 2 2 0 014 0zm-10 0a2 2 0 11-4 0 2 2 0 014 0z', roles: ['admin', 'mechanic'] },
-    { name: 'Invoices', href: '/invoices', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8', roles: ['admin'] },
-    { name: 'Parts Inventory', href: '/parts', icon: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12.01L20.73 6.96 M12 22.08V12', roles: ['admin'] },
-    { name: 'Reminders', href: '/reminders', icon: 'M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0', roles: ['admin'] }
+  const menuItems = [
+    { href: '/dashboard', label: 'Overview', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>, roles: ['admin', 'mechanic'] },
+    { href: '/jobs', label: 'Job Board', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>, roles: ['admin', 'mechanic'] },
+    { href: '/customers', label: 'Customers', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>, roles: ['admin'] },
+    { href: '/bookings', label: 'Web Bookings', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>, roles: ['admin'] },
+    { href: '/invoices', label: 'Invoicing', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>, roles: ['admin'] },
+    { href: '/parts', label: 'Inventory', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>, roles: ['admin'] },
+    { href: '/reminders', label: 'Retention', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"></path></svg>, roles: ['admin'] },
   ];
 
   return (
-    <aside className="app-sidebar glass-panel">
-      <div className="sidebar-header">
-        <div className="header-logo">
-          <span>Garage</span>Buddy
-        </div>
-        <div style={{ position: 'relative' }}>
-          <button 
-            onClick={() => setShowNotifications(!showNotifications)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', position: 'relative' }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            {notifications.length > 0 && (
-              <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '8px', height: '8px', background: 'var(--danger)', borderRadius: '50%' }}></span>
-            )}
-          </button>
-
-          {showNotifications && (
-            <div style={{ position: 'absolute', top: '100%', left: '100%', width: '250px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1rem', zIndex: 50, boxShadow: 'var(--shadow-lg)' }}>
-              <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Notifications</h4>
-              {notifications.length === 0 ? (
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>No new alerts.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {notifications.map(n => (
-                    <div key={n.id} style={{ fontSize: '0.75rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)' }}>
-                      {n.message}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+    <div className="sidebar">
+      <div className="sidebar-logo" style={{ marginBottom: '3rem', paddingLeft: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ width: '40px', height: '40px', background: 'var(--accent-gradient)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          </div>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.05em', color: 'var(--text-primary)', lineHeight: 0.8 }}>VARR</div>
+            <div style={{ fontWeight: 500, fontSize: '0.7rem', color: 'var(--accent-primary)', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: '0.25rem' }}>Automotive OS</div>
+          </div>
         </div>
       </div>
-      
-      <nav className="sidebar-nav">
-        {navItems.filter(item => item.roles.includes(userRole)).map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
+        {menuItems.filter(item => item.roles.includes(userRole || 'mechanic')).map((item) => {
+          const isActive = pathname === item.href;
           return (
-            <Link key={item.name} href={item.href} className={`nav-link ${isActive ? 'active' : ''}`}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d={item.icon}></path>
-              </svg>
-              {item.name}
+            <Link 
+              key={item.href} 
+              href={item.href} 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.875rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                textDecoration: 'none',
+                color: isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                background: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                transition: 'all 0.2s',
+                fontWeight: isActive ? 600 : 500,
+                border: isActive ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent'
+              }}
+            >
+              <span style={{ color: isActive ? 'var(--accent-primary)' : 'inherit', display: 'flex' }}>{item.icon}</span>
+              {item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="sidebar-footer">
-        <div className="user-profile">
-          <div className="user-avatar" style={{ background: userRole === 'admin' ? 'var(--accent-primary)' : 'var(--border-color)' }}>
-            {userInitial}
-          </div>
-          <button onClick={handleLogout} className="btn btn-secondary btn-sm" style={{ width: '100%', marginTop: '1rem' }}>
-            Sign Out
-          </button>
-        </div>
+      <div style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', position: 'relative' }}>
+        <Button 
+          variant="secondary" 
+          onClick={() => setShowNotifications(!showNotifications)}
+          style={{ width: '100%', justifyContent: 'space-between', padding: '0.875rem 1rem' }}
+          leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>}
+          rightIcon={notifications.length > 0 ? <span style={{ width: '8px', height: '8px', background: 'var(--danger)', borderRadius: '50%', boxShadow: '0 0 8px var(--danger)' }}></span> : null}
+        >
+          Alerts
+        </Button>
+
+        {showNotifications && (
+          <Card 
+            className="notifications-dropdown" 
+            style={{ position: 'absolute', bottom: '130px', left: '0', right: '0', zIndex: 100, padding: '1rem', maxHeight: '300px', overflowY: 'auto' }}
+          >
+            <h4 style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '1rem', letterSpacing: '0.05em' }}>Recent Activity</h4>
+            {notifications.length === 0 ? (
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', textAlign: 'center', padding: '1rem 0' }}>All caught up!</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {notifications.map(n => (
+                  <div key={n.id} style={{ fontSize: '0.8125rem', padding: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{n.message}</div>
+                    <div style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem' }}>{new Date(n.created_at).toLocaleTimeString()}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        <Button 
+          variant="ghost" 
+          onClick={handleSignOut}
+          style={{ width: '100%', marginTop: '0.75rem', justifyContent: 'flex-start', color: 'var(--danger)' }}
+          leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>}
+        >
+          Sign Out
+        </Button>
       </div>
-    </aside>
+    </div>
   );
 }

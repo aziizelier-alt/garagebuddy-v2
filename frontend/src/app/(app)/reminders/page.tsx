@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { useGarage } from '@/hooks/useGarage';
 
 export default function RemindersPage() {
+  const { garageId } = useGarage();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifying, setNotifying] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchDueVehicles() {
+      if (!garageId) return;
       // Find jobs that are "done" to see vehicle history
       const { data, error } = await supabase
         .from('jobs')
@@ -18,6 +21,7 @@ export default function RemindersPage() {
           updated_at,
           vehicles(id, make, model, year, customers(id, name, phone, email))
         `)
+        .eq('garage_id', garageId)
         .eq('status', 'done')
         .order('updated_at', { ascending: false });
 
@@ -43,33 +47,24 @@ export default function RemindersPage() {
       setLoading(false);
     }
     
-    fetchDueVehicles();
-  }, []);
+    if (garageId) fetchDueVehicles();
+  }, [garageId]);
 
   const handleSendReminder = async (vehicle: any) => {
+    if (!garageId) return;
     setNotifying(vehicle.id);
     
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
-    if (!userId) return;
-
-    const { data: userRecord } = await supabase.from('users').select('garage_id').eq('id', userId).single();
-
-    if (userRecord?.garage_id) {
-      // Insert an internal notification log that the reminder was sent
-      await supabase.from('notifications').insert({
-        garage_id: userRecord.garage_id,
-        message: `System: Sent SMS/Email Service Reminder to ${vehicle.customers?.name} for their ${vehicle.make} ${vehicle.model}.`
-      });
-      
-      // Artificial delay to simulate sending SMS/Email
-      setTimeout(() => {
-        alert(`Service Reminder successfully sent to ${vehicle.customers?.name}!`);
-        setNotifying(null);
-      }, 800);
-    } else {
+    // Insert an internal notification log that the reminder was sent
+    await supabase.from('notifications').insert({
+      garage_id: garageId,
+      message: `System: Sent SMS/Email Service Reminder to ${vehicle.customers?.name} for their ${vehicle.make} ${vehicle.model}.`
+    });
+    
+    // Artificial delay to simulate sending SMS/Email
+    setTimeout(() => {
+      alert(`Service Reminder successfully sent to ${vehicle.customers?.name}!`);
       setNotifying(null);
-    }
+    }, 800);
   };
 
   return (
