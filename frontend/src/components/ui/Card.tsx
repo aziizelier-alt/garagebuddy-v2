@@ -16,12 +16,12 @@ export const Card: React.FC<CardProps> = ({
   padding = '1.5rem',
 }) => {
   const baseStyles: React.CSSProperties = {
-    background: glass ? 'rgba(15, 17, 23, 0.7)' : 'var(--bg-card)',
-    backdropFilter: glass ? 'blur(12px)' : 'none',
-    WebkitBackdropFilter: glass ? 'blur(12px)' : 'none',
+    background: glass ? 'var(--bg-card)' : 'var(--bg-sidebar)',
+    backdropFilter: glass ? 'var(--glass-blur)' : 'none',
+    WebkitBackdropFilter: glass ? 'var(--glass-blur)' : 'none',
     border: '1px solid var(--border-color)',
     borderRadius: 'var(--radius-md)',
-    boxShadow: 'var(--shadow-lg)',
+    boxShadow: 'var(--shadow-premium)',
     padding,
     overflow: 'hidden',
     position: 'relative',
