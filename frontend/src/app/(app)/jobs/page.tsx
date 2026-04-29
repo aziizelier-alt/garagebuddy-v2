@@ -105,14 +105,25 @@ export default function JobsPage() {
                     {job.description}
                   </div>
                   
-                  {column.id === 'in_progress' && (
-                    <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                        <div style={{ width: '65%', height: '100%', background: 'var(--accent-primary)', boxShadow: '0 0 8px var(--accent-primary)' }}></div>
+                  {column.id === 'in_progress' && (() => {
+                    const elapsed = Math.floor((Date.now() - new Date(job.updated_at || job.created_at).getTime()) / 60000);
+                    const estimated = 120; // 2hr default service window
+                    const pct = Math.min(100, Math.round((elapsed / estimated) * 100));
+                    const remaining = Math.max(0, estimated - elapsed);
+                    return (
+                      <div style={{ marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>Progress</span>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: pct >= 90 ? 'var(--success)' : 'var(--accent-primary)' }}>
+                            {remaining > 0 ? `ETA ${remaining}m` : 'Overdue'}
+                          </span>
+                        </div>
+                        <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: pct >= 90 ? 'var(--success)' : 'var(--accent-primary)', boxShadow: `0 0 8px ${pct >= 90 ? 'var(--success)' : 'var(--accent-primary)'}`, transition: 'width 1s ease' }}></div>
+                        </div>
                       </div>
-                      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent-primary)' }}>ETA: 45m</span>
-                    </div>
-                  )}
+                    );
+                  })()}
                   
                   <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>

@@ -3,12 +3,19 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
+interface UserProfile {
+  full_name: string;
+  role: string;
+  garage_id: string;
+}
+
 interface UserContextType {
   userId: string | null;
   garageId: string | null;
   userRole: string | null;
   loading: boolean;
   userName: string | null;
+  userProfile: UserProfile | null;
 }
 
 const UserContext = createContext<UserContextType>({
@@ -17,6 +24,7 @@ const UserContext = createContext<UserContextType>({
   userRole: null,
   loading: true,
   userName: null,
+  userProfile: null,
 });
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -24,6 +32,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [garageId, setGarageId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +52,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setGarageId(userDoc.garage_id);
           setUserRole(userDoc.role);
           setUserName(userDoc.full_name || session.user.email?.split('@')[0] || 'User');
+          setUserProfile(userDoc);
         }
       }
       setLoading(false);
@@ -59,6 +69,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setGarageId(null);
         setUserRole(null);
         setUserName(null);
+        setUserProfile(null);
       }
     });
 
@@ -66,7 +77,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <UserContext.Provider value={{ userId, garageId, userRole, loading, userName }}>
+    <UserContext.Provider value={{ userId, garageId, userRole, loading, userName, userProfile }}>
       {children}
     </UserContext.Provider>
   );
