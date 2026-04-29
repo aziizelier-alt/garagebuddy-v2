@@ -26,7 +26,7 @@ export default function InvoiceReceiptPage() {
         .from('invoices')
         .select(`
           *,
-          garages(name),
+          garages(name, tax_rate),
           jobs(
             description,
             vehicles(make, model, year, vin, customers(name, phone, email))
@@ -36,20 +36,18 @@ export default function InvoiceReceiptPage() {
         .single();
         
       if (error || !data) {
-        toast.error("Error fetching invoice");
+        toast.error('Error fetching invoice');
         router.push('/invoices');
         return;
       }
       
       setInvoice(data);
 
-      // Fetch parts for this job
       if (data.job_id) {
         const { data: pData } = await supabase
           .from('job_parts')
           .select('quantity, parts(name, price)')
           .eq('job_id', data.job_id);
-        
         if (pData) setJobParts(pData);
       }
       
@@ -60,38 +58,43 @@ export default function InvoiceReceiptPage() {
   }, [id, router]);
 
   if (loading) {
-    return <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading premium receipt...</div>;
+    return <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading receipt...</div>;
   }
 
   const customer = invoice.jobs?.vehicles?.customers;
   const vehicle = invoice.jobs?.vehicles;
-  
+
+  // Tax calculations — all computed BEFORE return
+  const taxRate = invoice.garages?.tax_rate || 0;
   const partsSubtotal = jobParts.reduce((acc, jp) => acc + (jp.quantity * (jp.parts?.price || 0)), 0);
-  const totalAmount = Number(invoice.total || 0);
-  const laborTotal = totalAmount - partsSubtotal;
+  const totalAmount = Number(invoice.total_amount || 0);
+  const subtotal = taxRate > 0 ? totalAmount / (1 + taxRate / 100) : totalAmount;
+  const taxAmount = totalAmount - subtotal;
+  const laborTotal = subtotal - partsSubtotal;
 
   return (
     <div className="animate-fade-in" style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
       <div className="no-print" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/invoices" style={{ textDecoration: 'none' }}>
-          <Button variant="secondary" leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>}>
+          <Button variant="secondary" leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>}>
             Back to Invoices
           </Button>
         </Link>
-        <Button onClick={() => window.print()} leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>}>
+        <Button onClick={() => window.print()} leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>}>
           Print Receipt
         </Button>
       </div>
 
-      <Card glass={false} style={{ background: '#fff', color: '#1e293b', padding: '4rem', borderRadius: '4px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }} className="invoice-paper">
+      <Card glass={false} style={{ background: '#fff', color: '#1e293b', padding: '4rem', borderRadius: '4px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} className="invoice-paper">
         
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #f1f5f9', paddingBottom: '2.5rem', marginBottom: '2.5rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-               <div style={{ width: '32px', height: '32px', background: '#3b82f6', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-               </div>
-               <h1 style={{ margin: 0, fontSize: '1.75rem', color: '#0f172a', fontWeight: 900, letterSpacing: '-0.025em' }}>{invoice.garages?.name}</h1>
+              <div style={{ width: '32px', height: '32px', background: '#3b82f6', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><circle cx="12" cy="5" r="2.5" fill="white"/><path d="M12 7.5V16.5M12 16.5L9 21.5M12 16.5L15 21.5M9 11.5L5 9.5M15 11.5L19 9.5" stroke="white" strokeWidth="1.5"/></svg>
+              </div>
+              <h1 style={{ margin: 0, fontSize: '1.75rem', color: '#0f172a', fontWeight: 900, letterSpacing: '-0.025em' }}>{invoice.garages?.name || 'VARR Workshop'}</h1>
             </div>
             <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem', fontWeight: 500 }}>Official Service Invoice</p>
           </div>
@@ -105,6 +108,7 @@ export default function InvoiceReceiptPage() {
           </div>
         </div>
 
+        {/* Billing Details */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', marginBottom: '3rem' }}>
           <div>
             <h3 style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em', fontWeight: 700 }}>Billed To</h3>
@@ -119,13 +123,15 @@ export default function InvoiceReceiptPage() {
           </div>
         </div>
 
+        {/* Work Description */}
         <div style={{ marginBottom: '3rem' }}>
           <h3 style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em', fontWeight: 700 }}>Work Carried Out</h3>
           <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#334155', fontSize: '0.9375rem', lineHeight: 1.6 }}>
-            {invoice.jobs?.description}
+            {invoice.jobs?.description || 'General service and inspection.'}
           </div>
         </div>
 
+        {/* Line Items */}
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '3rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
@@ -138,14 +144,14 @@ export default function InvoiceReceiptPage() {
           <tbody>
             {jobParts.map((jp, i) => (
               <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '1.25rem 0.5rem', fontWeight: 500 }}>{jp.parts.name}</td>
+                <td style={{ padding: '1.25rem 0.5rem', fontWeight: 500 }}>{jp.parts?.name}</td>
                 <td style={{ textAlign: 'center', padding: '1.25rem 0.5rem', color: '#475569' }}>{jp.quantity}</td>
-                <td style={{ textAlign: 'right', padding: '1.25rem 0.5rem', color: '#475569' }}>£{Number(jp.parts.price).toFixed(2)}</td>
-                <td style={{ textAlign: 'right', padding: '1.25rem 0.5rem', fontWeight: 600 }}>£{(jp.quantity * jp.parts.price).toFixed(2)}</td>
+                <td style={{ textAlign: 'right', padding: '1.25rem 0.5rem', color: '#475569' }}>£{Number(jp.parts?.price || 0).toFixed(2)}</td>
+                <td style={{ textAlign: 'right', padding: '1.25rem 0.5rem', fontWeight: 600 }}>£{(jp.quantity * (jp.parts?.price || 0)).toFixed(2)}</td>
               </tr>
             ))}
             <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-              <td style={{ padding: '1.25rem 0.5rem', fontWeight: 500 }}>Labor & Service Fees</td>
+              <td style={{ padding: '1.25rem 0.5rem', fontWeight: 500 }}>Labor &amp; Service Fees</td>
               <td style={{ textAlign: 'center', padding: '1.25rem 0.5rem', color: '#475569' }}>—</td>
               <td style={{ textAlign: 'right', padding: '1.25rem 0.5rem', color: '#475569' }}>—</td>
               <td style={{ textAlign: 'right', padding: '1.25rem 0.5rem', fontWeight: 600 }}>£{laborTotal.toFixed(2)}</td>
@@ -153,15 +159,7 @@ export default function InvoiceReceiptPage() {
           </tbody>
         </table>
 
-  const taxRate = invoice.garages?.tax_rate || 0;
-  const partsSubtotal = jobParts.reduce((acc, jp) => acc + (jp.quantity * (jp.parts?.price || 0)), 0);
-  const totalAmount = Number(invoice.total_amount || 0);
-  const subtotal = totalAmount / (1 + (taxRate / 100));
-  const taxAmount = totalAmount - subtotal;
-  const laborTotal = subtotal - partsSubtotal;
-
-  return (
-    // ... inside the totals div
+        {/* Totals */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ width: '320px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', color: '#64748b', fontSize: '0.9375rem' }}>
@@ -179,8 +177,9 @@ export default function InvoiceReceiptPage() {
           </div>
         </div>
 
+        {/* Footer */}
         <div style={{ marginTop: '5rem', borderTop: '1px solid #f1f5f9', paddingTop: '2rem', textAlign: 'center' }}>
-          <p style={{ color: '#475569', fontWeight: 600, marginBottom: '0.5rem' }}>Thank you for choosing {invoice.garages?.name}!</p>
+          <p style={{ color: '#475569', fontWeight: 600, marginBottom: '0.5rem' }}>Thank you for choosing {invoice.garages?.name || 'VARR Workshop'}!</p>
           <p style={{ color: '#94a3b8', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Payment is due upon receipt • No returns on electrical parts</p>
         </div>
       </Card>

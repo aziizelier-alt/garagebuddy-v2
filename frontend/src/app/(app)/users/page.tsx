@@ -154,7 +154,7 @@ export default function UsersManagement() {
           </div>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowInviteModal(false)}>Cancel</Button>
-            <Button type="submit" style={{ flex: 1 }} loading={isInviting}>Send Invitation</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={isInviting}>Send Invitation</Button>
           </div>
         </form>
       </Modal>

@@ -154,7 +154,7 @@ export default function GarageSettings() {
         </div>
 
         <div style={{ marginTop: '3rem', display: 'flex', justifyContent: 'flex-end' }}>
-          <Button type="submit" size="lg" loading={saving}>Save System Configuration</Button>
+          <Button type="submit" size="lg" isLoading={saving}>Save System Configuration</Button>
         </div>
       </form>
     </div>

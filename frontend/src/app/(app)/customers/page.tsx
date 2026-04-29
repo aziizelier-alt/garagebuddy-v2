@@ -279,7 +279,7 @@ export default function CustomersPage() {
           </div>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowCustModal(false)}>Cancel</Button>
-            <Button type="submit" style={{ flex: 1 }} loading={isSaving}>Add Customer</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Add Customer</Button>
           </div>
         </form>
       </Modal>
@@ -313,7 +313,7 @@ export default function CustomersPage() {
           </div>
           <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowVehModal(false)}>Cancel</Button>
-            <Button type="submit" style={{ flex: 1 }} loading={isSaving}>Register Vehicle</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Register Vehicle</Button>
           </div>
         </form>
       </Modal>

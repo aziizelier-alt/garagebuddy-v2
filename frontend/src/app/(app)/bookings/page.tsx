@@ -270,7 +270,7 @@ export default function BookingsPage() {
                       <td style={{ maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>{req.issue_description}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <Button size="sm" onClick={() => handleApprove(req)} loading={processingId === req.id}>Schedule</Button>
+                          <Button size="sm" onClick={() => handleApprove(req)} isLoading={processingId === req.id}>Schedule</Button>
                           <Button size="sm" variant="ghost" onClick={() => handleReject(req)} style={{ color: 'var(--danger)' }}>Reject</Button>
                         </div>
                       </td>
@@ -318,7 +318,7 @@ export default function BookingsPage() {
           )}
           <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel</Button>
-            <Button type="submit" style={{ flex: 1 }} loading={processingId === 'creating'}>Confirm Booking</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={processingId === 'creating'}>Confirm Booking</Button>
           </div>
         </form>
       </Modal>
