@@ -100,21 +100,8 @@ export default function Navigation() {
         </div>
       </div>
 
-      <div style={{ marginBottom: '2rem' }}>
-        <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: 800, letterSpacing: '0.1em', marginBottom: '0.75rem' }}>Active Branch</div>
-        <select 
-          className="form-input" 
-          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', fontSize: '0.8125rem', fontWeight: 600 }}
-          defaultValue="london-north"
-        >
-          <option value="london-north">🇬🇧 London North (Main)</option>
-          <option value="london-south">🇬🇧 London South (Express)</option>
-          <option value="manchester">🇬🇧 Manchester Central</option>
-        </select>
-      </div>
-
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1 }}>
-        {menuItems.filter(item => item.roles.includes(userRole || 'mechanic')).map((item) => {
+        {menuItems.filter(item => !userRole || item.roles.includes(userRole)).map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link 
