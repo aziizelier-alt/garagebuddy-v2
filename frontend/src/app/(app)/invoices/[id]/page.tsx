@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
+import { useUser } from '@/hooks/useUser';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -13,6 +14,7 @@ export default function InvoiceReceiptPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
+  const { garageId } = useUser();
   
   const [invoice, setInvoice] = useState<any>(null);
   const [jobParts, setJobParts] = useState<any[]>([]);
@@ -20,7 +22,7 @@ export default function InvoiceReceiptPage() {
 
   useEffect(() => {
     async function fetchInvoiceDetails() {
-      if (!id) return;
+      if (!id || !garageId) return;
       
       const { data, error } = await supabase
         .from('invoices')
@@ -33,6 +35,7 @@ export default function InvoiceReceiptPage() {
           )
         `)
         .eq('id', id)
+        .eq('garage_id', garageId)
         .single();
         
       if (error || !data) {

@@ -39,7 +39,8 @@ export default function JobsPage() {
     const { error } = await supabase
       .from('jobs')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq('id', jobId);
+      .eq('id', jobId)
+      .eq('garage_id', garageId);
 
     if (error) {
       toast.error("Failed to update status");

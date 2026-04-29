@@ -44,7 +44,8 @@ export default function InventoryPage() {
     const { error: pErr } = await supabase
       .from('parts')
       .update({ quantity: newStock })
-      .eq('id', selectedPart.id);
+      .eq('id', selectedPart.id)
+      .eq('garage_id', garageId);
 
     if (pErr) {
       toast.error("Failed to update stock");

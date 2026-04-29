@@ -56,7 +56,7 @@ export default function BookingsPage() {
 
   useEffect(() => {
     if (newBooking.customer_id) {
-      supabase.from('vehicles').select('id, make, model').eq('customer_id', newBooking.customer_id).then(({ data }) => {
+      supabase.from('vehicles').select('id, make, model').eq('customer_id', newBooking.customer_id).eq('garage_id', garageId).then(({ data }) => {
         setVehicles(data || []);
       });
     }
@@ -121,7 +121,7 @@ export default function BookingsPage() {
     });
 
     if (!error) {
-      await supabase.from('booking_requests').update({ status: 'approved' }).eq('id', req.id);
+      await supabase.from('booking_requests').update({ status: 'approved' }).eq('id', req.id).eq('garage_id', garageId);
       toast.success('Request approved and scheduled.');
       fetchData();
     } else {
@@ -132,7 +132,7 @@ export default function BookingsPage() {
 
   const handleReject = async (req: any) => {
     setProcessingId(req.id);
-    await supabase.from('booking_requests').update({ status: 'rejected' }).eq('id', req.id);
+    await supabase.from('booking_requests').update({ status: 'rejected' }).eq('id', req.id).eq('garage_id', garageId);
     toast.success('Request rejected.');
     fetchData();
     setProcessingId(null);
