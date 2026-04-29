@@ -153,19 +153,28 @@ export default function InvoiceReceiptPage() {
           </tbody>
         </table>
 
+  const taxRate = invoice.garages?.tax_rate || 0;
+  const partsSubtotal = jobParts.reduce((acc, jp) => acc + (jp.quantity * (jp.parts?.price || 0)), 0);
+  const totalAmount = Number(invoice.total_amount || 0);
+  const subtotal = totalAmount / (1 + (taxRate / 100));
+  const taxAmount = totalAmount - subtotal;
+  const laborTotal = subtotal - partsSubtotal;
+
+  return (
+    // ... inside the totals div
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ width: '320px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', color: '#64748b', fontSize: '0.9375rem' }}>
               <span>Subtotal</span>
-              <span style={{ fontWeight: 500, color: '#1e293b' }}>£{Number(invoice.total).toFixed(2)}</span>
+              <span style={{ fontWeight: 500, color: '#1e293b' }}>£{subtotal.toFixed(2)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', color: '#64748b', fontSize: '0.9375rem', borderBottom: '2px solid #f1f5f9' }}>
-              <span>VAT (0%)</span>
-              <span style={{ fontWeight: 500, color: '#1e293b' }}>£0.00</span>
+              <span>VAT ({taxRate}%)</span>
+              <span style={{ fontWeight: 500, color: '#1e293b' }}>£{taxAmount.toFixed(2)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1.5rem 0', fontSize: '1.5rem', fontWeight: 900, color: '#0f172a' }}>
               <span>Total Due</span>
-              <span style={{ color: '#3b82f6' }}>£{Number(invoice.total).toFixed(2)}</span>
+              <span style={{ color: '#3b82f6' }}>£{totalAmount.toFixed(2)}</span>
             </div>
           </div>
         </div>

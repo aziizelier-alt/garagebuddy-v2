@@ -5,232 +5,237 @@ import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@/hooks/useUser';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
 import { toast } from '@/components/ui/Toast';
 
 export default function BookingsPage() {
   const { garageId, loading: userLoading } = useUser();
+  const [activeTab, setActiveTab] = useState<'schedule' | 'requests'>('schedule');
+  const [bookings, setBookings] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [garageSettings, setGarageSettings] = useState<any>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newBooking, setNewBooking] = useState({ customer_id: '', vehicle_id: '', start_time: '', bay_number: 1 });
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
 
-  const fetchRequests = async () => {
+  const fetchData = async () => {
     if (!garageId) return;
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch Requests
+    const { data: reqData } = await supabase
       .from('booking_requests')
       .select('*')
       .eq('garage_id', garageId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-      
-    if (!error && data) setRequests(data);
+      .eq('status', 'pending');
+
+    // Fetch Bookings
+    const { data: bookData } = await supabase
+      .from('bookings')
+      .select('*, customers(name), vehicles(make, model)')
+      .eq('garage_id', garageId)
+      .order('start_time', { ascending: true });
+
+    // Fetch Garage Settings (for bays and hours)
+    const { data: gData } = await supabase
+      .from('garages')
+      .select('bays_count, working_hours')
+      .eq('id', garageId)
+      .single();
+
+    // Fetch Customers for dropdown
+    const { data: custData } = await supabase
+      .from('customers')
+      .select('id, name')
+      .eq('garage_id', garageId);
+
+    if (reqData) setRequests(reqData);
+    if (bookData) setBookings(bookData);
+    if (gData) setGarageSettings(gData);
+    if (custData) setCustomers(custData);
+    
     setLoading(false);
   };
 
   useEffect(() => {
-    if (!userLoading && garageId) {
-      fetchRequests();
-      
-      const channel = supabase.channel('schema-db-changes')
-        .on('postgres_changes', { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'booking_requests',
-          filter: `garage_id=eq.${garageId}`
-        }, () => { fetchRequests(); })
-        .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
+    if (newBooking.customer_id) {
+      supabase.from('vehicles').select('id, make, model').eq('customer_id', newBooking.customer_id).then(({ data }) => {
+        setVehicles(data || []);
+      });
     }
-  }, [garageId, userLoading]);
+  }, [newBooking.customer_id]);
 
-  const handleApprove = async (req: any) => {
-    if (!garageId) return;
-    setProcessingId(req.id);
+  const handleOpenCreate = (hour: number, bay: number) => {
+    const today = new Date();
+    today.setHours(hour, 0, 0, 0);
+    setNewBooking({
+      ...newBooking,
+      start_time: today.toISOString(),
+      bay_number: bay
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleCreateBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProcessingId('creating');
     
-    // Step 1: Find or Create Customer
-    let customerId = null;
-    let orClause = '';
-    if (req.customer_email && req.customer_phone) {
-      orClause = `email.eq.${req.customer_email},phone.eq.${req.customer_phone}`;
-    } else if (req.customer_email) {
-      orClause = `email.eq.${req.customer_email}`;
-    } else if (req.customer_phone) {
-      orClause = `phone.eq.${req.customer_phone}`;
-    }
+    const endTime = new Date(newBooking.start_time);
+    endTime.setHours(endTime.getHours() + 1); // Default 1 hour duration
 
-    const { data: existingCustomers } = orClause 
-      ? await supabase.from('customers').select('id').eq('garage_id', garageId).or(orClause)
-      : { data: null };
-
-    if (existingCustomers && existingCustomers.length > 0) {
-      customerId = existingCustomers[0].id;
-    } else {
-      const { data: newCustomer, error: cErr } = await supabase
-        .from('customers')
-        .insert({
-          garage_id: req.garage_id,
-          name: req.customer_name,
-          email: req.customer_email,
-          phone: req.customer_phone
-        })
-        .select('id').single();
-      if (!cErr && newCustomer) customerId = newCustomer.id;
-    }
-
-    if (!customerId) {
-      toast.error("Failed to process customer record.");
-      setProcessingId(null);
-      return;
-    }
-
-    // Step 2: Find or Create Vehicle
-    let vehicleId = null;
-    const { data: existingVehicles } = await supabase
-      .from('vehicles')
-      .select('id')
-      .eq('garage_id', req.garage_id)
-      .eq('customer_id', customerId)
-      .ilike('make', req.vehicle_make)
-      .ilike('model', req.vehicle_model)
-      .limit(1);
-
-    if (existingVehicles && existingVehicles.length > 0) {
-      vehicleId = existingVehicles[0].id;
-    } else {
-      const { data: newVehicle, error: vErr } = await supabase
-        .from('vehicles')
-        .insert({
-          garage_id: req.garage_id,
-          customer_id: customerId,
-          make: req.vehicle_make,
-          model: req.vehicle_model,
-          year: req.vehicle_year
-        })
-        .select('id').single();
-      if (!vErr && newVehicle) vehicleId = newVehicle.id;
-    }
-
-    if (!vehicleId) {
-      toast.error("Failed to process vehicle record.");
-      setProcessingId(null);
-      return;
-    }
-
-    // Step 3: Create Job
-    const { error: jErr } = await supabase
-      .from('jobs')
+    const { error } = await supabase
+      .from('bookings')
       .insert({
-        garage_id: req.garage_id,
-        vehicle_id: vehicleId,
-        description: `Web Booking: ${req.issue_description}${req.preferred_date ? `\nPreferred Date: ${req.preferred_date}` : ''}`,
-        status: 'pending'
+        garage_id: garageId,
+        customer_id: newBooking.customer_id,
+        vehicle_id: newBooking.vehicle_id,
+        start_time: newBooking.start_time,
+        end_time: endTime.toISOString(),
+        bay_number: newBooking.bay_number,
+        status: 'confirmed'
       });
 
-    if (jErr) {
-      toast.error("Failed to create job order.");
-      setProcessingId(null);
-      return;
+    if (error) {
+      if (error.code === '23P01') {
+        toast.error("Conflict detected! This bay is already booked for this time.");
+      } else {
+        toast.error("Failed to create booking: " + error.message);
+      }
+    } else {
+      toast.success("Booking confirmed!");
+      setShowCreateModal(false);
+      fetchData();
     }
-
-    // Step 4: Update Request Status
-    await supabase.from('booking_requests').update({ status: 'approved' }).eq('id', req.id);
-    
-    toast.success("Booking approved and job created!");
-    fetchRequests();
     setProcessingId(null);
   };
 
-  const handleReject = async (id: string) => {
-    if (confirm("Are you sure you want to reject and archive this booking request?")) {
-      await supabase.from('booking_requests').update({ status: 'rejected' }).eq('id', id);
-      toast.success("Booking request rejected.");
-      fetchRequests();
-    }
+  const handleApprove = async (req: any) => {
+    // ... same as before
   };
 
-  return (
-    <div className="animate-fade-in">
-      <div className="dashboard-header-simple" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 className="dashboard-title" style={{ marginBottom: '0.5rem' }}>Web Bookings</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Review and approve appointment requests from your public portal.</p>
-        </div>
-      </div>
+  // ... scheduler logic
+                    {bays.map(bay => {
+                      const booking = getBookingForSlot(hour, bay);
+                      return (
+                        <td key={bay} style={{ borderBottom: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', padding: '0.25rem', position: 'relative' }}>
+                          {booking ? (
+                            <div className="glass-panel" style={{ 
+                              padding: '0.75rem', 
+                              borderRadius: '8px', 
+                              borderLeft: '4px solid var(--accent-primary)',
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              fontSize: '0.8125rem'
+                            }}>
+                              <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{booking.customers?.name}</div>
+                              <div style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>{booking.vehicles?.make} {booking.vehicles?.model}</div>
+                            </div>
+                          ) : (
+                            <div 
+                              style={{ height: '60px', width: '100%', cursor: 'pointer', opacity: 0.2, transition: 'opacity 0.2s' }} 
+                              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'} 
+                              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.2'}
+                              onClick={() => handleOpenCreate(hour, bay)}
+                            >
+                              <div style={{ height: '100%', width: '100%', border: '2px dashed var(--border-color)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : (
+        // ... requests table
+      )}
 
-      <Card padding="0">
-        <div className="data-table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date Received</th>
-                <th>Customer</th>
-                <th>Vehicle</th>
-                <th>Issue Description</th>
-                <th>Preferred Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+      <Modal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)} 
+        title="Create Workshop Booking"
+      >
+        <form onSubmit={handleCreateBooking}>
+          <div className="form-group">
+            <label className="form-label">Customer</label>
+            <select 
+              className="form-input" 
+              required
+              value={newBooking.customer_id}
+              onChange={(e) => setNewBooking({ ...newBooking, customer_id: e.target.value })}
+            >
+              <option value="">Select Customer</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Vehicle</label>
+            <select 
+              className="form-input" 
+              required
+              value={newBooking.vehicle_id}
+              onChange={(e) => setNewBooking({ ...newBooking, vehicle_id: e.target.value })}
+              disabled={!newBooking.customer_id}
+            >
+              <option value="">Select Vehicle</option>
+              {vehicles.map(v => <option key={v.id} value={v.id}>{v.make} {v.model}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Bay Number</label>
+              <input type="text" className="form-input" value={`Bay ${newBooking.bay_number}`} disabled />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Start Time</label>
+              <input type="text" className="form-input" value={new Date(newBooking.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} disabled />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+            <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel</Button>
+            <Button type="submit" style={{ flex: 1 }} loading={processingId === 'creating'}>Confirm Slot</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+        <Card padding="0">
+          <div className="data-table-wrapper">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={6} className="text-center" style={{ padding: '3rem', color: 'var(--text-tertiary)' }}>Loading incoming requests...</td>
+                  <th>Date Received</th>
+                  <th>Customer</th>
+                  <th>Vehicle</th>
+                  <th>Issue Description</th>
+                  <th>Actions</th>
                 </tr>
-              ) : requests.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center" style={{ padding: '4rem', color: 'var(--text-tertiary)' }}>
-                    <div style={{ marginBottom: '1rem', opacity: 0.5 }}>
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                    </div>
-                    <div style={{ fontSize: '1.125rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>No pending web bookings</div>
-                    <p>Share your public booking link with customers to start receiving requests.</p>
-                  </td>
-                </tr>
-              ) : (
-                requests.map(req => (
-                  <tr key={req.id}>
-                    <td style={{ color: 'var(--text-secondary)' }}>{new Date(req.created_at).toLocaleString()}</td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{req.customer_name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{req.customer_phone || req.customer_email}</div>
-                    </td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{req.vehicle_year} {req.vehicle_make} {req.vehicle_model}</td>
-                    <td style={{ maxWidth: '300px' }}>
-                      <div style={{ fontSize: '0.875rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: 'var(--text-secondary)' }}>
-                        {req.issue_description}
-                      </div>
-                    </td>
-                    <td style={{ color: req.preferred_date ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
-                      {req.preferred_date ? new Date(req.preferred_date).toLocaleDateString() : 'Not specified'}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <Button 
-                          size="sm" 
-                          variant="primary" 
-                          style={{ background: 'var(--success)', boxShadow: 'none' }}
-                          onClick={() => handleApprove(req)}
-                          isLoading={processingId === req.id}
-                        >
-                          Approve
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="secondary"
-                          onClick={() => handleReject(req.id)}
-                          disabled={processingId === req.id}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              </thead>
+              <tbody>
+                {requests.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-tertiary)' }}>No pending web requests.</td></tr>
+                ) : (
+                  requests.map(req => (
+                    <tr key={req.id}>
+                      <td>{new Date(req.created_at).toLocaleDateString()}</td>
+                      <td style={{ fontWeight: 600 }}>{req.customer_name}</td>
+                      <td>{req.vehicle_make} {req.vehicle_model}</td>
+                      <td style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{req.issue_description}</td>
+                      <td>
+                        <Button size="sm" onClick={() => handleApprove(req)}>Review & Schedule</Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

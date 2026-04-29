@@ -53,11 +53,27 @@ export default function AuthPage() {
       
       <div className="animate-fade-in" style={{ width: '100%', maxWidth: '440px', position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <div style={{ width: '64px', height: '64px', background: 'var(--accent-gradient)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto', boxShadow: '0 8px 24px rgba(59, 130, 246, 0.4)' }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          <div style={{ 
+            width: '80px', 
+            height: '80px', 
+            background: 'rgba(255, 255, 255, 0.05)', 
+            borderRadius: '24px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            margin: '0 auto 1.5rem auto', 
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 0 30px rgba(59, 130, 246, 0.1)' 
+          }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="5" r="2.5" fill="var(--text-primary)"/>
+              <path d="M12 7.5V16.5M12 16.5L9 21.5M12 16.5L15 21.5M9 11.5L5 9.5M15 11.5L19 9.5" stroke="var(--text-primary)" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M5 10C5 10 8 7.5 12 7.5C16 7.5 19 10 19 10" stroke="var(--warning)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 3"/>
+              <path d="M5 19C5 19 8 21.5 12 21.5C16 21.5 19 19 19 19" stroke="var(--warning)" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="3 3"/>
+            </svg>
           </div>
           <h1 style={{ fontSize: '3.5rem', fontWeight: 900, letterSpacing: '-0.05em', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>VARR</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem' }}>The high-performance OS for modern workshops.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1.125rem' }}>The high-performance Enterprise OS for modern workshops.</p>
         </div>
 
         <div className="glass-panel" style={{ padding: '2.5rem', borderRadius: '24px' }}>

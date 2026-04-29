@@ -3,74 +3,96 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@/hooks/useUser';
-import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Badge } from '@/components/ui/Badge';
 import { toast } from '@/components/ui/Toast';
 
-export default function PartsPage() {
-  const { garageId, loading: userLoading } = useUser();
+export default function InventoryPage() {
+  const { garageId, userId } = useUser();
   const [parts, setParts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', price: '', stock: '' });
-  const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPart, setSelectedPart] = useState<any>(null);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustAmount, setAdjustAmount] = useState(0);
+  const [adjustReason, setAdjustReason] = useState('Manual Stock Adjustment');
+
+  useEffect(() => {
+    if (garageId) fetchParts();
+  }, [garageId]);
 
   const fetchParts = async () => {
-    if (!garageId) return;
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('parts')
       .select('*')
       .eq('garage_id', garageId)
       .order('name', { ascending: true });
-      
-    if (!error && data) setParts(data);
+    
+    if (data) setParts(data);
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (!userLoading && garageId) fetchParts();
-  }, [garageId, userLoading]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!garageId) return;
-    setSubmitting(true);
+    if (!selectedPart || !userId) return;
 
-    const { error } = await supabase.from('parts').insert({
+    const newStock = selectedPart.quantity + adjustAmount;
+    
+    // 1. Update Parts Table
+    const { error: pErr } = await supabase
+      .from('parts')
+      .update({ quantity: newStock })
+      .eq('id', selectedPart.id);
+
+    if (pErr) {
+      toast.error("Failed to update stock");
+      return;
+    }
+
+    // 2. Log Movement
+    await supabase.from('inventory_logs').insert({
       garage_id: garageId,
-      name: formData.name,
-      price: parseFloat(formData.price),
-      stock: parseInt(formData.stock) || 0
+      part_id: selectedPart.id,
+      change_amount: adjustAmount,
+      reason: adjustReason,
+      created_by: userId
     });
 
-    if (!error) {
-      setIsModalOpen(false);
-      setFormData({ name: '', price: '', stock: '' });
-      fetchParts();
-      toast.success('Part added to inventory');
-    } else {
-      toast.error('Error adding part: ' + error.message);
-    }
-    setSubmitting(false);
+    toast.success("Inventory synchronized");
+    setShowAdjustModal(false);
+    fetchParts();
   };
+
+  const filteredParts = parts.filter(p => 
+    p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="animate-fade-in">
-      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 className="dashboard-title" style={{ marginBottom: '0.5rem' }}>Inventory</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Manage physical stock and pricing for components.</p>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Inventory & Parts</h1>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Track stock levels, bin locations, and part movements.</p>
         </div>
         <Button 
-          onClick={() => setIsModalOpen(true)}
-          leftIcon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>}
+          leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>}
         >
-          Add Part
+          Add New Part
         </Button>
+      </div>
+
+      <div style={{ marginBottom: '2rem' }}>
+        <input 
+          type="text" 
+          className="form-input" 
+          placeholder="Search by Name or SKU..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ maxWidth: '400px' }}
+        />
       </div>
 
       <Card padding="0">
@@ -78,93 +100,79 @@ export default function PartsPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Part Name</th>
+                <th>Part Description</th>
+                <th>SKU / Reference</th>
+                <th>Location</th>
+                <th>Stock Level</th>
                 <th>Unit Price</th>
-                <th>In Stock</th>
-                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="text-center" style={{ padding: '3rem', color: 'var(--text-tertiary)' }}>Loading inventory...</td>
-                </tr>
-              ) : parts.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center" style={{ padding: '4rem', color: 'var(--text-tertiary)' }}>
-                    <div style={{ marginBottom: '1rem', opacity: 0.5 }}>
-                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path></svg>
+              {filteredParts.map(part => (
+                <tr key={part.id}>
+                  <td>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{part.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{part.description || 'No description'}</div>
+                  </td>
+                  <td><code style={{ fontSize: '0.8125rem' }}>{part.sku || 'N/A'}</code></td>
+                  <td>
+                    <span className="status-badge status-pending" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                      {part.bin_location || 'Unset'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ fontWeight: 800, fontSize: '1rem', color: part.quantity <= (part.min_stock_level || 5) ? 'var(--danger)' : 'var(--text-primary)' }}>
+                        {part.quantity}
+                      </span>
+                      {part.quantity <= (part.min_stock_level || 5) && (
+                        <span className="status-badge status-pending" style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)' }}>LOW STOCK</span>
+                      )}
                     </div>
-                    <div style={{ fontSize: '1.125rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Empty inventory</div>
-                    <p>Start adding parts to track your garage's stock levels.</p>
+                  </td>
+                  <td>£{part.price?.toFixed(2)}</td>
+                  <td>
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedPart(part); setShowAdjustModal(true); }}>Adjust</Button>
                   </td>
                 </tr>
-              ) : (
-                parts.map(p => (
-                  <tr key={p.id}>
-                    <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>£{Number(p.price).toFixed(2)}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{p.stock} units</td>
-                    <td>
-                      <Badge variant={p.stock > 10 ? 'success' : p.stock > 0 ? 'warning' : 'danger'}>
-                        {p.stock > 10 ? 'In Stock' : p.stock > 0 ? 'Low Stock' : 'Out of Stock'}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Button variant="ghost" size="sm">Edit</Button>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </Card>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Inventory Part">
-        <form onSubmit={handleSubmit}>
+      <Modal isOpen={showAdjustModal} onClose={() => setShowAdjustModal(false)} title={`Adjust Stock: ${selectedPart?.name}`}>
+        <form onSubmit={handleAdjustStock}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{ fontSize: '0.875rem', color: 'var(--text-tertiary)', marginBottom: '0.5rem' }}>Current Inventory</div>
+            <div style={{ fontSize: '3rem', fontWeight: 900, color: 'var(--accent-primary)' }}>{selectedPart?.quantity}</div>
+          </div>
+
           <div className="form-group">
-            <label className="form-label">Part Name *</label>
+            <label className="form-label">Adjustment Amount (e.g. +10 or -2)</label>
             <input 
-              type="text" 
+              type="number" 
               className="form-input" 
               required 
-              placeholder="e.g. Brake Pads (Front)"
-              value={formData.name}
-              onChange={e => setFormData({...formData, name: e.target.value})}
+              value={adjustAmount} 
+              onChange={(e) => setAdjustAmount(parseInt(e.target.value))} 
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-            <div className="form-group">
-              <label className="form-label">Unit Price (£) *</label>
-              <input 
-                type="number" 
-                step="0.01"
-                className="form-input" 
-                required 
-                placeholder="45.00"
-                value={formData.price}
-                onChange={e => setFormData({...formData, price: e.target.value})}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Initial Stock *</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                required 
-                placeholder="10"
-                value={formData.stock}
-                onChange={e => setFormData({...formData, stock: e.target.value})}
-              />
-            </div>
+          <div className="form-group">
+            <label className="form-label">Reason for Change</label>
+            <select className="form-input" value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)}>
+              <option>Manual Stock Take</option>
+              <option>Stock Received (Restock)</option>
+              <option>Damaged / Scrapped</option>
+              <option>Correction</option>
+            </select>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2.5rem' }}>
-            <Button variant="secondary" type="button" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" isLoading={submitting}>Save to Inventory</Button>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+            <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowAdjustModal(false)}>Cancel</Button>
+            <Button type="submit" style={{ flex: 1 }}>Update Stock</Button>
           </div>
         </form>
       </Modal>

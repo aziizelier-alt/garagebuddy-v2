@@ -2,195 +2,96 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useGarage } from '@/hooks/useGarage';
-import Modal from '@/components/Modal';
+import { useUser } from '@/hooks/useUser';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { toast } from '@/components/ui/Toast';
 
 export default function VehiclesPage() {
-  const { garageId } = useGarage();
+  const { garageId } = useUser();
   const [vehicles, setVehicles] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ customer_id: '', make: '', model: '', year: '', vin: '' });
-  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (garageId) fetchVehicles();
+  }, [garageId]);
 
   const fetchVehicles = async () => {
-    if (!garageId) return;
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('vehicles')
-      .select('*, customers(name)')
+      .select('*, customers(name, phone)')
       .eq('garage_id', garageId)
       .order('created_at', { ascending: false });
-      
-    if (!error && data) setVehicles(data);
+    
+    if (data) setVehicles(data);
     setLoading(false);
   };
 
-  const fetchCustomersForDropdown = async () => {
-    if (!garageId) return;
-    const { data } = await supabase.from('customers').select('id, name').eq('garage_id', garageId).order('name');
-    if (data) setCustomers(data);
-  };
-
-  useEffect(() => {
-    if (garageId) {
-      fetchVehicles();
-      fetchCustomersForDropdown();
-    }
-  }, [garageId]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.customer_id || !garageId) {
-      alert("Please select an owner for this vehicle.");
-      return;
-    }
-    
-    setSubmitting(true);
-
-    const { error } = await supabase.from('vehicles').insert({
-      garage_id: garageId,
-      customer_id: formData.customer_id,
-      make: formData.make,
-      model: formData.model,
-      year: formData.year ? parseInt(formData.year) : null,
-      vin: formData.vin
-    });
-
-    if (!error) {
-      setIsModalOpen(false);
-      setFormData({ customer_id: '', make: '', model: '', year: '', vin: '' });
-      fetchVehicles();
-    } else {
-      alert('Error adding vehicle: ' + error.message);
-    }
-    setSubmitting(false);
-  };
+  const filteredVehicles = vehicles.filter(v => 
+    v.make?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.model?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.vin?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    v.license_plate?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="animate-fade-in">
-      <div className="dashboard-header-simple" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <h1 className="dashboard-title" style={{ marginBottom: '0.5rem' }}>Vehicles</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Track vehicles currently being serviced.</p>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Vehicle Registry</h1>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Global search and intelligence for all workshop assets.</p>
         </div>
-        <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setIsModalOpen(true)}>
-          + Add Vehicle
-        </button>
-      </div>
-
-      <div className="data-table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Make / Model</th>
-              <th>Year</th>
-              <th>VIN</th>
-              <th>Owner</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="text-center" style={{ padding: '2rem' }}>Loading vehicles...</td>
-              </tr>
-            ) : vehicles.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="text-center" style={{ padding: '2rem' }}>No vehicles found.</td>
-              </tr>
-            ) : (
-              vehicles.map(v => (
-                <tr key={v.id}>
-                  <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{v.make} {v.model}</td>
-                  <td>{v.year || '—'}</td>
-                  <td><code style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{v.vin || '—'}</code></td>
-                  <td>{v.customers?.name || '—'}</td>
-                  <td>
-                    <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', border: 'none' }}>View History</button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Vehicle">
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Vehicle Owner *</label>
-            <select 
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div className="form-group" style={{ marginBottom: 0, width: '300px' }}>
+            <input 
+              type="text" 
               className="form-input" 
-              required
-              value={formData.customer_id}
-              onChange={e => setFormData({...formData, customer_id: e.target.value})}
-            >
-              <option value="" disabled>Select a customer...</option>
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            {customers.length === 0 && <p style={{ fontSize: '0.75rem', color: 'var(--warning)', marginTop: '0.5rem' }}>No customers found. Please add a customer first.</p>}
+              placeholder="Search VIN, Plate, or Model..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ padding: '0.875rem 1.25rem' }}
+            />
           </div>
+          <Button variant="secondary" onClick={fetchVehicles}>Refresh</Button>
+        </div>
+      </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">Make *</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                required 
-                placeholder="e.g. Toyota"
-                value={formData.make}
-                onChange={e => setFormData({...formData, make: e.target.value})}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Model *</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                required 
-                placeholder="e.g. Camry"
-                value={formData.model}
-                onChange={e => setFormData({...formData, model: e.target.value})}
-              />
-            </div>
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+        {loading ? (
+          <div style={{ textAlign: 'center', gridColumn: '1 / -1', padding: '4rem', color: 'var(--text-tertiary)' }}>Scanning registry...</div>
+        ) : filteredVehicles.length === 0 ? (
+          <div style={{ textAlign: 'center', gridColumn: '1 / -1', padding: '4rem', color: 'var(--text-tertiary)' }}>No vehicles matching your search.</div>
+        ) : (
+          filteredVehicles.map(v => (
+            <Card key={v.id} padding="1.5rem">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                <div style={{ width: '48px', height: '48px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" strokeWidth="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>License Plate</div>
+                  <div style={{ fontWeight: 800, fontSize: '1.125rem', color: 'var(--text-primary)' }}>{v.license_plate || 'NOT SET'}</div>
+                </div>
+              </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">Year</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                placeholder="2023"
-                value={formData.year}
-                onChange={e => setFormData({...formData, year: e.target.value})}
-              />
-            </div>
-            <div className="form-group mb-4">
-              <label className="form-label">VIN (Vehicle ID Number)</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                value={formData.vin}
-                onChange={e => setFormData({...formData, vin: e.target.value})}
-              />
-            </div>
-          </div>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>{v.year} {v.make} {v.model}</h3>
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>VIN: {v.vin || 'Pending Entry'}</div>
+              </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting || customers.length === 0} style={{ width: 'auto' }}>
-              {submitting ? 'Saving...' : 'Save Vehicle'}
-            </button>
-          </div>
-        </form>
-      </Modal>
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>Owner</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{v.customers?.name || 'Unknown'}</div>
+                </div>
+                <Button variant="ghost" size="sm" style={{ color: 'var(--accent-primary)' }}>View History</Button>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 }
