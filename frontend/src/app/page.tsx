@@ -21,19 +21,26 @@ export default function AuthPage() {
 
   const handleAuth = async (e: FormEvent) => {
     e.preventDefault();
+    console.log('Auth attempt started...');
     setLoading(true);
     setError(null);
     
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        console.log('Attempting login with:', email);
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        console.log('Login successful, data:', data);
+        // Manual redirect in case middleware is slow
+        router.push('/dashboard');
+        router.refresh();
       } else {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         alert('Verification email sent! Check your inbox.');
       }
     } catch (err: any) {
+      console.error('Auth Error Details:', err);
       setError(err.message || 'Authentication error occurred.');
     } finally {
       setLoading(false);

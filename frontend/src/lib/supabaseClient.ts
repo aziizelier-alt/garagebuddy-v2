@@ -1,6 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr'
 
 export const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  'https://juurzinwywehnfhqnfib.supabase.co',
+  'sb_publishable_fWSsEVo7A0AVKoxp5Vyy0A_vPi6epCB'
 )
