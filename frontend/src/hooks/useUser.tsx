@@ -38,10 +38,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     async function initUser() {
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (session?.user) {
         setUserId(session.user.id);
-        
+
         const { data: userDoc } = await supabase
           .from('users')
           .select('garage_id, role, full_name')
@@ -57,7 +57,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setLoading(false);
     }
-    
+
     initUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 export default function BookingPage() {
   const params = useParams();
   const garageId = params.garage_id as string;
-  
+
   const [garageName, setGarageName] = useState<string>('Loading...');
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
@@ -28,13 +28,13 @@ export default function BookingPage() {
   useEffect(() => {
     async function fetchGarage() {
       if (!garageId) return;
-      
+
       const { data, error } = await supabase
         .from('garages')
         .select('name')
         .eq('id', garageId)
         .single();
-        
+
       if (data) {
         setGarageName(data.name);
       } else {
@@ -84,24 +84,24 @@ export default function BookingPage() {
   if (loading) return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading booking portal...</div>;
 
   return (
-    <div style={{ 
-      minHeight: isEmbed ? 'auto' : '100vh', 
-      background: isEmbed ? 'transparent' : 'var(--bg-color)', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      padding: isEmbed ? '0' : '2rem 1rem' 
+    <div style={{
+      minHeight: isEmbed ? 'auto' : '100vh',
+      background: isEmbed ? 'transparent' : 'var(--bg-color)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: isEmbed ? '0' : '2rem 1rem'
     }}>
-      <div className={isEmbed ? "" : "glass-panel"} style={{ 
-        maxWidth: '600px', 
-        width: '100%', 
-        padding: isEmbed ? '1rem' : '3rem', 
-        borderRadius: isEmbed ? '0' : '16px', 
-        border: isEmbed ? 'none' : '1px solid var(--border-color)', 
+      <div className={isEmbed ? "" : "glass-panel"} style={{
+        maxWidth: '600px',
+        width: '100%',
+        padding: isEmbed ? '1rem' : '3rem',
+        borderRadius: isEmbed ? '0' : '16px',
+        border: isEmbed ? 'none' : '1px solid var(--border-color)',
         boxShadow: isEmbed ? 'none' : 'var(--shadow-xl)',
         background: isEmbed ? 'transparent' : 'rgba(15, 17, 23, 0.7)'
       }}>
-        
+
         {submitted ? (
           <div style={{ textAlign: 'center', animation: 'fadeIn 0.5s ease-out' }}>
             <div style={{ width: '80px', height: '80px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem auto' }}>
@@ -111,8 +111,8 @@ export default function BookingPage() {
             <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '2rem' }}>
               Thank you for booking with <strong>{garageName}</strong>. Your request has been securely transmitted. We will contact you shortly via phone or email to confirm your slot!
             </p>
-            <a 
-              href="https://nottinghamscootercentre.uk" 
+            <a
+              href="https://nottinghamscootercentre.uk"
               className="btn btn-secondary"
               style={{ textDecoration: 'none', display: 'inline-block' }}
             >

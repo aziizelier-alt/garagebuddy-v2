@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { Card } from '@/components/ui/Card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
 import { useUser } from '@/hooks/useUser';
@@ -72,7 +72,10 @@ export default function GarageSettings() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
           {/* Profile Card */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <Card title="Shop Profile">
+            <Card>
+              <CardHeader>
+                <CardTitle>Shop Profile</CardTitle>
+              </CardHeader>
               <div className="form-group">
                 <label className="form-label">Workshop Name</label>
                 <input 
@@ -100,7 +103,10 @@ export default function GarageSettings() {
               </div>
             </Card>
 
-            <Card title="System Preferences">
+            <Card>
+              <CardHeader>
+                <CardTitle>System Preferences</CardTitle>
+              </CardHeader>
               <div className="form-group">
                 <label className="form-label">Timezone</label>
                 <select className="form-input" disabled>
@@ -117,7 +123,10 @@ export default function GarageSettings() {
           </div>
 
           {/* Hours Card */}
-          <Card title="Operational Hours">
+          <Card>
+            <CardHeader>
+              <CardTitle>Operational Hours</CardTitle>
+            </CardHeader>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {days.map((day) => (
                 <div key={day} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>

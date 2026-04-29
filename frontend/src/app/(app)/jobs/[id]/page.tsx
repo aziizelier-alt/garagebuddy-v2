@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@/hooks/useUser';
-import { Card } from '@/components/ui/Card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
 
@@ -75,13 +75,16 @@ export default function JobDetailPage() {
     <div className="animate-fade-in">
       <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '2rem' }}>
         <Button variant="ghost" onClick={() => router.back()}>← Back</Button>
-        <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Job Order #{id.toString().split('-')[0]}</h1>
+        <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Job Order #{String(id).split('-')[0]}</h1>
         <span className={`status-badge status-${job.status}`} style={{ marginLeft: 'auto' }}>{job.status}</span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <Card title="Task Checklist (SOP)">
+          <Card>
+            <CardHeader>
+              <CardTitle>Task Checklist (SOP)</CardTitle>
+            </CardHeader>
             <p style={{ color: 'var(--text-tertiary)', fontSize: '0.8125rem', marginBottom: '1.5rem' }}>Complete all standard operating procedures before marking ready.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {tasks.map(task => (
@@ -119,7 +122,10 @@ export default function JobDetailPage() {
             </div>
           </Card>
 
-          <Card title="Workshop Intelligence">
+          <Card>
+            <CardHeader>
+              <CardTitle>Workshop Intelligence</CardTitle>
+            </CardHeader>
             <div className="form-group">
               <label className="form-label">Internal Handover Notes</label>
               <textarea 
@@ -134,7 +140,10 @@ export default function JobDetailPage() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <Card title="Assets & Owner">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assets & Owner</CardTitle>
+            </CardHeader>
             <div style={{ marginBottom: '1.5rem' }}>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginBottom: '0.25rem' }}>Vehicle</div>
               <div style={{ fontWeight: 700 }}>{job.vehicles?.year} {job.vehicles?.make} {job.vehicles?.model}</div>
@@ -145,7 +154,10 @@ export default function JobDetailPage() {
             </div>
           </Card>
 
-          <Card title="Assignment">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assignment</CardTitle>
+            </CardHeader>
             <div className="form-group">
               <label className="form-label">Assigned Mechanic</label>
               <select 
