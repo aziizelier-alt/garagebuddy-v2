@@ -125,6 +125,34 @@ export default function BookingsPage() {
     setProcessingId(null);
   };
 
+  const handleApprove = async (req: any) => {
+    setProcessingId(req.id);
+    const { error } = await supabase.from('bookings').insert({
+      garage_id: garageId,
+      bay_number: 1,
+      status: 'confirmed',
+      start_time: new Date().toISOString(),
+      end_time: new Date(Date.now() + 3600000).toISOString(),
+    });
+
+    if (!error) {
+      await supabase.from('booking_requests').update({ status: 'approved' }).eq('id', req.id).eq('garage_id', garageId);
+      toast.success('Request approved and scheduled.');
+      fetchData();
+    } else {
+      toast.error('Failed to approve request.');
+    }
+    setProcessingId(null);
+  };
+
+  const handleReject = async (req: any) => {
+    setProcessingId(req.id);
+    await supabase.from('booking_requests').update({ status: 'rejected' }).eq('id', req.id).eq('garage_id', garageId);
+    toast.success('Request rejected.');
+    fetchData();
+    setProcessingId(null);
+  };
+
   const changeDate = (days: number) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
@@ -277,7 +305,39 @@ export default function BookingsPage() {
         </Card>
       ) : (
         <Card padding="0">
-          {/* Web Requests List */}
+          <div className="data-table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Received</th>
+                  <th>Customer</th>
+                  <th>Vehicle</th>
+                  <th>Issue</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-tertiary)' }}>No pending web requests.</td></tr>
+                ) : (
+                  requests.map(req => (
+                    <tr key={req.id}>
+                      <td style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)' }}>{new Date(req.created_at).toLocaleDateString()}</td>
+                      <td style={{ fontWeight: 600 }}>{req.customer_name}</td>
+                      <td>{req.vehicle_make} {req.vehicle_model}</td>
+                      <td style={{ maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>{req.issue_description}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <Button size="sm" onClick={() => handleApprove(req)} isLoading={processingId === req.id}>Schedule</Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleReject(req)} style={{ color: 'var(--danger)' }}>Reject</Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 
