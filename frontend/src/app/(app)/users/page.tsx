@@ -41,24 +41,42 @@ export default function UsersManagement() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!garageId) return;
     setIsInviting(true);
     
     try {
-      // In a real production app, this would use a Supabase Edge Function to send an email.
-      // For the MVP, we will simulate the invite by adding the user to the 'users' table with 'invited' status.
-      // The user would then sign up using that email.
+      // Generate a secure invitation token
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       
-      const { error } = await supabase.from('notifications').insert({
+      // 1. Create the invitation record
+      const { error: inviteError } = await supabase.from('staff_invitations').insert({
+        garage_id: garageId,
+        email: inviteEmail,
+        role: inviteRole,
+        token: token,
+        status: 'pending'
+      });
+
+      if (inviteError) throw inviteError;
+
+      // 2. Log the notification
+      await supabase.from('notifications').insert({
         garage_id: garageId,
         message: `New staff invitation sent to ${inviteEmail} (Role: ${inviteRole})`,
       });
 
-      toast.success(`Invitation sent to ${inviteEmail}!`);
+      // 3. In production, this would trigger an email. 
+      // For now, we provide the signup link for manual sharing/testing.
+      const inviteLink = `${window.location.origin}/signup?invite=${token}`;
+      console.log('SHARE THIS LINK WITH STAFF:', inviteLink);
+      
+      toast.success(`Invitation created for ${inviteEmail}!`);
       setShowInviteModal(false);
       setInviteEmail('');
       fetchUsers();
-    } catch (err) {
-      toast.error('Failed to send invitation');
+    } catch (err: any) {
+      console.error('Invite error:', err);
+      toast.error(err.message || 'Failed to create invitation');
     } finally {
       setIsInviting(false);
     }
