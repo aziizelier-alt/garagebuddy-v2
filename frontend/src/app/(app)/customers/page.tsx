@@ -73,7 +73,7 @@ export default function CustomersPage() {
     } else {
       toast.success('Customer added!');
       setShowCustModal(false);
-      setNewCust({ name: '', phone: '', email: '', address: '', tags: [] });
+      setNewCust({ name: '', phone: '', email: '', address: '', company_name: '', is_fleet: false, preferred_contact: 'phone', tags: [] });
       fetchCustomers();
       if (data) setSelectedCustomer(data);
     }
@@ -99,7 +99,7 @@ export default function CustomersPage() {
     } else {
       toast.success('Vehicle registered!');
       setShowVehModal(false);
-      setNewVeh({ make: '', model: '', year: '', license_plate: '', mileage: '' });
+      setNewVeh({ make: '', model: '', year: '', license_plate: '', mileage: '', fuel_type: 'Petrol', transmission: 'Manual', vin: '', engine_code: '' });
       fetchCustomers();
     }
     setIsSaving(false);
