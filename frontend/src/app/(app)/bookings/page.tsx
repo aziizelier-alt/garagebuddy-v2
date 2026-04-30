@@ -33,7 +33,14 @@ export default function BookingsPage() {
     start_time: '', 
     bay_number: 1, 
     service_type: 'service',
-    duration: '1'
+    duration: '1',
+    // Express fields
+    isExpress: false,
+    express_name: '',
+    express_phone: '',
+    express_plate: '',
+    express_make: '',
+    express_model: ''
   });
 
   const [customers, setCustomers] = useState<any[]>([]);
@@ -88,10 +95,35 @@ export default function BookingsPage() {
     });
   };
 
+  useEffect(() => {
+    const durations: Record<string, string> = {
+      mot: '1',
+      service: '2',
+      diagnostic: '1',
+      repair: '4'
+    };
+    if (newBooking.service_type) {
+      setNewBooking(prev => ({ ...prev, duration: durations[prev.service_type] || '1' }));
+    }
+  }, [newBooking.service_type]);
+
   const handleOpenCreate = (hour: number, bay: number) => {
     const date = new Date(selectedDate);
     date.setHours(hour, 0, 0, 0);
-    setNewBooking({ ...newBooking, start_time: date.toISOString(), bay_number: bay });
+    setNewBooking({ 
+      customer_id: '', 
+      vehicle_id: '', 
+      start_time: date.toISOString(), 
+      bay_number: bay,
+      service_type: 'service',
+      duration: '2',
+      isExpress: false,
+      express_name: '',
+      express_phone: '',
+      express_plate: '',
+      express_make: '',
+      express_model: ''
+    });
     setShowCreateModal(true);
   };
 
@@ -99,30 +131,57 @@ export default function BookingsPage() {
     e.preventDefault();
     setProcessingId('creating');
     
-    const startTime = new Date(newBooking.start_time);
-    const endTime = new Date(startTime);
-    endTime.setHours(startTime.getHours() + parseInt(newBooking.duration));
+    try {
+      let finalCustomerId = newBooking.customer_id;
+      let finalVehicleId = newBooking.vehicle_id;
 
-    const { error } = await supabase.from('bookings').insert({
-      garage_id: garageId,
-      customer_id: newBooking.customer_id,
-      vehicle_id: newBooking.vehicle_id,
-      start_time: newBooking.start_time,
-      end_time: endTime.toISOString(),
-      bay_number: newBooking.bay_number,
-      service_type: newBooking.service_type,
-      status: 'confirmed',
-    });
+      if (newBooking.isExpress) {
+        // 1. Create Customer
+        const { data: cust, error: custErr } = await supabase.from('customers').insert({
+          garage_id: garageId,
+          name: newBooking.express_name,
+          phone: newBooking.express_phone
+        }).select().single();
+        if (custErr) throw custErr;
+        finalCustomerId = cust.id;
 
-    if (error) {
-      toast.error('Scheduling Conflict: This bay is occupied.');
-    } else {
+        // 2. Create Vehicle
+        const { data: veh, error: vehErr } = await supabase.from('vehicles').insert({
+          garage_id: garageId,
+          customer_id: finalCustomerId,
+          license_plate: newBooking.express_plate.toUpperCase(),
+          make: newBooking.express_make,
+          model: newBooking.express_model
+        }).select().single();
+        if (vehErr) throw vehErr;
+        finalVehicleId = veh.id;
+      }
+
+      const startTime = new Date(newBooking.start_time);
+      const endTime = new Date(startTime);
+      endTime.setHours(startTime.getHours() + parseInt(newBooking.duration));
+
+      const { error } = await supabase.from('bookings').insert({
+        garage_id: garageId,
+        customer_id: finalCustomerId,
+        vehicle_id: finalVehicleId,
+        start_time: newBooking.start_time,
+        end_time: endTime.toISOString(),
+        bay_number: newBooking.bay_number,
+        service_type: newBooking.service_type,
+        status: 'confirmed',
+      });
+
+      if (error) throw error;
+
       toast.success('Service Scheduled Successfully');
       setShowCreateModal(false);
-      setNewBooking({ customer_id: '', vehicle_id: '', start_time: '', bay_number: 1, service_type: 'service', duration: '1' });
       fetchData();
+    } catch (err: any) {
+      toast.error(err.message || 'Scheduling Conflict or Data Error');
+    } finally {
+      setProcessingId(null);
     }
-    setProcessingId(null);
   };
 
   const handleApprove = async (req: any) => {
@@ -344,21 +403,57 @@ export default function BookingsPage() {
       {/* MODAL: CREATE BOOKING */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Operational Dispatch: New Booking">
         <form onSubmit={handleCreateBooking}>
-          <div className="form-group">
-            <label className="form-label">Client Lookup *</label>
-            <select className="form-input" required value={newBooking.customer_id} onChange={e => setNewBooking({ ...newBooking, customer_id: e.target.value, vehicle_id: '' })}>
-              <option value="">Select Customer</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', padding: '0.25rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+            <button type="button" onClick={() => setNewBooking({ ...newBooking, isExpress: false })} style={{ flex: 1, padding: '0.5rem', borderRadius: '10px', border: 'none', background: !newBooking.isExpress ? 'var(--accent-primary)' : 'transparent', color: !newBooking.isExpress ? 'white' : 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}>Existing Client</button>
+            <button type="button" onClick={() => setNewBooking({ ...newBooking, isExpress: true })} style={{ flex: 1, padding: '0.5rem', borderRadius: '10px', border: 'none', background: newBooking.isExpress ? 'var(--accent-primary)' : 'transparent', color: newBooking.isExpress ? 'white' : 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}>Express (New)</button>
           </div>
-          
-          <div className="form-group">
-            <label className="form-label">Vehicle Context *</label>
-            <select className="form-input" required value={newBooking.vehicle_id} onChange={e => setNewBooking({ ...newBooking, vehicle_id: e.target.value })} disabled={!newBooking.customer_id}>
-              <option value="">Select Asset</option>
-              {vehicles.map(v => <option key={v.id} value={v.id}>{v.license_plate} — {v.make} {v.model}</option>)}
-            </select>
-          </div>
+
+          {newBooking.isExpress ? (
+            <div className="animate-slide-in">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Customer Name *</label>
+                  <input type="text" className="form-input" required value={newBooking.express_name} onChange={e => setNewBooking({ ...newBooking, express_name: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone *</label>
+                  <input type="tel" className="form-input" required value={newBooking.express_phone} onChange={e => setNewBooking({ ...newBooking, express_phone: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: '1rem' }}>
+                <label className="form-label">Number Plate *</label>
+                <input type="text" className="form-input" required placeholder="AB12 CDE" value={newBooking.express_plate} onChange={e => setNewBooking({ ...newBooking, express_plate: e.target.value.toUpperCase() })} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Make</label>
+                  <input type="text" className="form-input" placeholder="BMW" value={newBooking.express_make} onChange={e => setNewBooking({ ...newBooking, express_make: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Model</label>
+                  <input type="text" className="form-input" placeholder="320d" value={newBooking.express_model} onChange={e => setNewBooking({ ...newBooking, express_model: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="animate-slide-in">
+              <div className="form-group">
+                <label className="form-label">Client Lookup *</label>
+                <select className="form-input" required value={newBooking.customer_id} onChange={e => setNewBooking({ ...newBooking, customer_id: e.target.value, vehicle_id: '' })}>
+                  <option value="">Select Customer</option>
+                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Vehicle Context *</label>
+                <select className="form-input" required value={newBooking.vehicle_id} onChange={e => setNewBooking({ ...newBooking, vehicle_id: e.target.value })} disabled={!newBooking.customer_id}>
+                  <option value="">Select Asset</option>
+                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.license_plate} — {v.make} {v.model}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.5rem', marginTop: '1.5rem' }}>
             <div className="form-group">
