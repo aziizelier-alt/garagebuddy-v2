@@ -230,18 +230,19 @@ export default function BookingsPage() {
         </div>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Button variant="ghost" size="sm" onClick={() => changeDate(-1)}>←</Button>
-            <span style={{ fontWeight: 800, fontSize: '0.875rem', minWidth: '140px', textAlign: 'center' }}>
-              {selectedDate.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.75rem', backdropFilter: 'blur(10px)' }}>
+            <Button variant="ghost" style={{ width: '32px', height: '32px', padding: 0 }} onClick={() => changeDate(-1)}>←</Button>
+            <span style={{ fontWeight: 800, fontSize: '0.8125rem', minWidth: '130px', textAlign: 'center', letterSpacing: '0.02em', color: 'var(--text-primary)' }}>
+              {selectedDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}
             </span>
-            <Button variant="ghost" size="sm" onClick={() => changeDate(1)}>→</Button>
+            <Button variant="ghost" style={{ width: '32px', height: '32px', padding: 0 }} onClick={() => changeDate(1)}>→</Button>
           </div>
           <Button
-            leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>}
+            leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>}
             onClick={() => setShowCreateModal(true)}
+            style={{ boxShadow: '0 4px 15px rgba(59, 130, 246, 0.2)' }}
           >
-            Create Booking
+            New Booking
           </Button>
         </div>
       </div>
@@ -275,13 +276,13 @@ export default function BookingsPage() {
       {activeTab === 'schedule' ? (
         <Card padding="0" glass>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '800px' }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '900px' }}>
               <thead>
                 <tr>
-                  <th style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)', color: 'var(--text-tertiary)', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', width: '100px' }}>Timeline</th>
+                  <th style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', color: 'var(--text-tertiary)', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', width: '90px', letterSpacing: '0.1em' }}>Timeline</th>
                   {bays.map(bay => (
-                    <th key={bay} style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)', color: 'var(--text-tertiary)', fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', borderLeft: '1px solid var(--border-color)', textAlign: 'center' }}>
-                      Bay {bay}
+                    <th key={bay} style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', color: 'var(--text-tertiary)', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', borderBottom: '1px solid var(--border-color)', borderLeft: '1px solid var(--border-color)', textAlign: 'center', letterSpacing: '0.1em' }}>
+                      Workshop Bay {bay}
                     </th>
                   ))}
                 </tr>
@@ -289,7 +290,7 @@ export default function BookingsPage() {
               <tbody>
                 {HOURS.map(hour => (
                   <tr key={hour}>
-                    <td style={{ padding: '1.5rem 1.25rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center' }}>
+                    <td style={{ padding: '1.25rem 1rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 800, textAlign: 'center', background: 'rgba(255,255,255,0.01)' }}>
                       {hour % 12 || 12} {hour >= 12 ? 'PM' : 'AM'}
                     </td>
                     {bays.map(bay => {
@@ -297,21 +298,22 @@ export default function BookingsPage() {
                       const serviceColor = SERVICE_TYPES.find(t => t.id === booking?.service_type)?.color || 'var(--accent-primary)';
                       
                       return (
-                        <td key={bay} style={{ borderBottom: '1px solid var(--border-color)', borderLeft: '1px solid var(--border-color)', position: 'relative', height: '100px', padding: '0.5rem' }}>
+                        <td key={bay} style={{ borderBottom: '1px solid var(--border-color)', borderLeft: '1px solid var(--border-color)', position: 'relative', height: '80px', padding: '0.4rem' }}>
                           {booking ? (
                             <div className="booking-card" style={{
                               height: '100%',
-                              background: `${serviceColor}15`,
+                              background: `${serviceColor}10`,
                               borderLeft: `4px solid ${serviceColor}`,
-                              borderRadius: '8px',
-                              padding: '0.75rem',
+                              borderRadius: '10px',
+                              padding: '0.6rem 0.75rem',
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'center',
-                              boxShadow: `0 4px 15px ${serviceColor}10`
+                              boxShadow: `0 4px 12px ${serviceColor}08`,
+                              backdropFilter: 'blur(4px)'
                             }}>
-                              <div style={{ fontWeight: 800, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{booking.customers?.name}</div>
-                              <div style={{ fontSize: '0.7rem', fontWeight: 700, color: serviceColor, textTransform: 'uppercase', marginTop: '0.25rem' }}>
+                              <div style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{booking.customers?.name}</div>
+                              <div style={{ fontSize: '0.65rem', fontWeight: 800, color: serviceColor, textTransform: 'uppercase', marginTop: '0.15rem', letterSpacing: '0.02em' }}>
                                 {booking.vehicles?.license_plate} · {booking.service_type}
                               </div>
                             </div>
@@ -400,9 +402,9 @@ export default function BookingsPage() {
         </Card>
       )}
 
-      {/* MODAL: CREATE BOOKING */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Operational Dispatch: New Booking">
-        <form onSubmit={handleCreateBooking}>
+        <div style={{ width: '100%', minWidth: '550px' }}>
+          <form onSubmit={handleCreateBooking}>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', padding: '0.25rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
             <button type="button" onClick={() => setNewBooking({ ...newBooking, isExpress: false })} style={{ flex: 1, padding: '0.5rem', borderRadius: '10px', border: 'none', background: !newBooking.isExpress ? 'var(--accent-primary)' : 'transparent', color: !newBooking.isExpress ? 'white' : 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}>Existing Client</button>
             <button type="button" onClick={() => setNewBooking({ ...newBooking, isExpress: true })} style={{ flex: 1, padding: '0.5rem', borderRadius: '10px', border: 'none', background: newBooking.isExpress ? 'var(--accent-primary)' : 'transparent', color: newBooking.isExpress ? 'white' : 'var(--text-tertiary)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}>Express (New)</button>
@@ -478,10 +480,11 @@ export default function BookingsPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
-            <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel</Button>
-            <Button type="submit" style={{ flex: 1 }} isLoading={processingId === 'creating'}>Confirm & Schedule</Button>
+            <Button variant="ghost" style={{ flex: 1 }} onClick={() => setShowCreateModal(false)}>Cancel Dispatch</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={processingId === 'creating'}>Confirm & Schedule Service</Button>
           </div>
         </form>
+        </div>
       </Modal>
 
       <style jsx global>{`
