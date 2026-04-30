@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from '@/components/ui/Toast';
 import MasterTimeline from '@/components/MasterTimeline';
+import VarrAssistant from '@/components/VarrAssistant';
 import Link from 'next/link';
 
 export default function CustomerProfilePage() {
@@ -242,6 +243,8 @@ export default function CustomerProfilePage() {
       {/* CENTER: OPERATIONS HUB */}
       <main className="operations-hub">
         
+        <VarrAssistant />
+
         {/* ALERTS & INTELLIGENCE */}
         {alerts.map((alert, i) => (
           <Card key={i} style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--danger)', marginBottom: '1.5rem' }}>

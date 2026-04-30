@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@/hooks/useUser';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import VarrAssistant from '@/components/VarrAssistant';
 import Link from 'next/link';
 
 export default function Dashboard() {
@@ -115,6 +116,9 @@ export default function Dashboard() {
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{stats.todayBookings} bookings completed</div>
         </div>
       </div>
+
+      {/* VARR ASSISTANT: GUIDANCE ENGINE */}
+      <VarrAssistant />
 
       {/* KPI Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>

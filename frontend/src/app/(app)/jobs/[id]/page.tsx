@@ -7,6 +7,7 @@ import { useUser } from '@/hooks/useUser';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
+import VarrAssistant from '@/components/VarrAssistant';
 
 export default function JobDetailPage() {
   const { id } = useParams();
@@ -78,6 +79,8 @@ export default function JobDetailPage() {
         <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Job Order #{String(id).split('-')[0]}</h1>
         <span className={`status-badge status-${job.status}`} style={{ marginLeft: 'auto' }}>{job.status}</span>
       </div>
+
+      <VarrAssistant />
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>

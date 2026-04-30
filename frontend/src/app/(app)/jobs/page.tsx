@@ -6,6 +6,7 @@ import { useUser } from '@/hooks/useUser';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/ui/Toast';
+import VarrAssistant from '@/components/VarrAssistant';
 
 const STATUS_COLUMNS = [
   { id: 'pending', label: 'Backlog', color: 'var(--text-tertiary)' },
@@ -63,6 +64,8 @@ export default function JobsPage() {
           Create Job
         </Button>
       </div>
+      
+      <VarrAssistant />
 
       <div style={{ display: 'flex', gap: '1.5rem', flex: 1, overflowX: 'auto', paddingBottom: '1rem' }}>
         {STATUS_COLUMNS.map(column => (
