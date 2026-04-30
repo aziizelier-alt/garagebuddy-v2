@@ -1,9 +1,7 @@
 import React from 'react';
 
-interface CardProps {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  className?: string;
-  style?: React.CSSProperties;
   glass?: boolean;
   padding?: string;
 }
@@ -14,6 +12,7 @@ export const Card: React.FC<CardProps> = ({
   style,
   glass = true,
   padding = '1.5rem',
+  ...props
 }) => {
   const baseStyles: React.CSSProperties = {
     background: glass ? 'var(--bg-card)' : 'var(--bg-sidebar)',
@@ -29,7 +28,11 @@ export const Card: React.FC<CardProps> = ({
   };
 
   return (
-    <div className={`card ${glass ? 'glass-panel' : ''} ${className || ''}`} style={baseStyles}>
+    <div 
+      className={`card ${glass ? 'glass-panel' : ''} ${className || ''}`} 
+      style={baseStyles}
+      {...props}
+    >
       {children}
     </div>
   );
