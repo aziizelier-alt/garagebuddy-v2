@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@/hooks/useUser';
 import { Card } from '@/components/ui/Card';
@@ -17,6 +18,7 @@ const STATUS_COLUMNS = [
 
 export default function JobsPage() {
   const { garageId } = useUser();
+  const router = useRouter();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +62,7 @@ export default function JobsPage() {
         </div>
         <Button 
           leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>}
+          onClick={() => router.push('/customers')}
         >
           Create Job
         </Button>

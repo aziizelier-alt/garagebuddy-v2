@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@/hooks/useUser';
 import { Card } from '@/components/ui/Card';
@@ -10,6 +11,7 @@ import { toast } from '@/components/ui/Toast';
 
 export default function CustomersPage() {
   const { garageId } = useUser();
+  const router = useRouter();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -147,7 +149,7 @@ export default function CustomersPage() {
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: '4rem' }}>No records found.</td></tr>
               ) : (
                 filtered.map(c => (
-                  <tr key={c.id} onClick={() => setSelectedCustomer(c)} style={{ cursor: 'pointer', background: selectedCustomer?.id === c.id ? 'rgba(59,130,246,0.05)' : 'transparent' }}>
+                  <tr key={c.id} onClick={() => router.push(`/customers/${c.id}`)} style={{ cursor: 'pointer', background: selectedCustomer?.id === c.id ? 'rgba(59,130,246,0.05)' : 'transparent' }}>
                     <td>
                       <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.address || 'No address'}</div>
@@ -251,8 +253,9 @@ export default function CustomersPage() {
               <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Selected Client</div>
               <div style={{ fontWeight: 800 }}>{selectedCustomer.name}</div>
             </div>
-            <Button size="sm" onClick={() => setShowVehModal(true)}>+ Vehicle</Button>
-            <Button size="sm" variant="secondary" onClick={() => setSelectedCustomer(null)}>Deselect</Button>
+            <Button size="sm" onClick={() => router.push(`/customers/${selectedCustomer.id}`)}>Open Profile</Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowVehModal(true)}>+ Vehicle</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedCustomer(null)}>×</Button>
           </Card>
         </div>
       )}

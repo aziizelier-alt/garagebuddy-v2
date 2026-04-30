@@ -25,8 +25,10 @@ export default function CustomerProfilePage() {
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [showJobModal, setShowJobModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showVehModal, setShowVehModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newJob, setNewJob] = useState({ description: '', priority: 'normal' });
+  const [newVeh, setNewVeh] = useState({ make: '', model: '', year: '', license_plate: '', mileage: '' });
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -184,6 +186,31 @@ export default function CustomerProfilePage() {
     setIsSaving(false);
   };
 
+  const handleCreateVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!garageId) return;
+    setIsSaving(true);
+    
+    const { error } = await supabase
+      .from('vehicles')
+      .insert({ 
+        ...newVeh, 
+        mileage: parseInt(newVeh.mileage) || 0,
+        customer_id: id, 
+        garage_id: garageId 
+      });
+
+    if (error) {
+      toast.error('Failed to add vehicle');
+    } else {
+      toast.success('Vehicle registered!');
+      setShowVehModal(false);
+      setNewVeh({ make: '', model: '', year: '', license_plate: '', mileage: '' });
+      fetchCustomer();
+    }
+    setIsSaving(false);
+  };
+
   if (loading) {
     return <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>Initializing Intelligence Hub...</div>;
   }
@@ -302,7 +329,7 @@ export default function CustomerProfilePage() {
               </Card>
             );
           })}
-            <Button variant="ghost" style={{ minWidth: '100px', height: '120px', border: '1px dashed var(--border-color)' }}>
+            <Button variant="ghost" style={{ minWidth: '100px', height: '120px', border: '1px dashed var(--border-color)' }} onClick={() => setShowVehModal(true)}>
               + Add
             </Button>
           </div>
@@ -332,7 +359,7 @@ export default function CustomerProfilePage() {
           >
             New Job Order
           </Button>
-          <Button variant="secondary" style={{ justifyContent: 'flex-start' }} leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>}>Create Quote</Button>
+          <Button variant="secondary" style={{ justifyContent: 'flex-start' }} leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>} onClick={() => toast.info('Quote Engine under development')}>Create Quote</Button>
           <Button 
             variant="secondary" 
             style={{ justifyContent: 'flex-start' }} 
@@ -341,7 +368,7 @@ export default function CustomerProfilePage() {
           >
             Message Client
           </Button>
-          <Button variant="secondary" style={{ justifyContent: 'flex-start' }} leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>Book Appointment</Button>
+          <Button variant="secondary" style={{ justifyContent: 'flex-start' }} leftIcon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>} onClick={() => router.push('/bookings')}>Book Appointment</Button>
         </div>
 
         <div style={{ marginTop: 'auto' }}>
@@ -405,6 +432,39 @@ export default function CustomerProfilePage() {
           <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowMessageModal(false)}>Cancel</Button>
             <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Send Message</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={showVehModal} onClose={() => setShowVehModal(false)} title="Register New Vehicle">
+        <form onSubmit={handleCreateVehicle}>
+          <div className="form-group">
+            <label className="form-label">License Plate *</label>
+            <input type="text" className="form-input" required placeholder="AB12 CDE" value={newVeh.license_plate} onChange={e => setNewVeh({ ...newVeh, license_plate: e.target.value.toUpperCase() })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Make *</label>
+              <input type="text" className="form-input" required placeholder="BMW" value={newVeh.make} onChange={e => setNewVeh({ ...newVeh, make: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Model *</label>
+              <input type="text" className="form-input" required placeholder="320d" value={newVeh.model} onChange={e => setNewVeh({ ...newVeh, model: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Year</label>
+              <input type="text" className="form-input" placeholder="2020" value={newVeh.year} onChange={e => setNewVeh({ ...newVeh, year: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Current Mileage</label>
+              <input type="number" className="form-input" placeholder="45000" value={newVeh.mileage} onChange={e => setNewVeh({ ...newVeh, mileage: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+            <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowVehModal(false)}>Cancel</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Register Vehicle</Button>
           </div>
         </form>
       </Modal>
