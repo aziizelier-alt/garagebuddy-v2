@@ -25,6 +25,9 @@ export default function CustomersPage() {
     phone: '', 
     email: '', 
     address: '',
+    company_name: '',
+    is_fleet: false,
+    preferred_contact: 'phone',
     tags: [] as string[]
   });
 
@@ -33,7 +36,11 @@ export default function CustomersPage() {
     model: '', 
     year: '', 
     license_plate: '',
-    mileage: ''
+    mileage: '',
+    fuel_type: 'Petrol',
+    transmission: 'Manual',
+    vin: '',
+    engine_code: ''
   });
 
   useEffect(() => {
@@ -183,42 +190,71 @@ export default function CustomersPage() {
         </div>
       </Card>
 
-      {/* New Customer Modal */}
       <Modal isOpen={showCustModal} onClose={() => setShowCustModal(false)} title="Register New Customer">
         <form onSubmit={handleCreateCustomer}>
-          <div className="form-group">
-            <label className="form-label">Full Name *</label>
-            <input type="text" className="form-input" required value={newCust.name} onChange={e => setNewCust({ ...newCust, name: e.target.value })} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
             <div className="form-group">
-              <label className="form-label">Phone *</label>
+              <label className="form-label">Full Name *</label>
+              <input type="text" className="form-input" required value={newCust.name} onChange={e => setNewCust({ ...newCust, name: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Company / Fleet Name</label>
+              <input type="text" className="form-input" placeholder="Optional" value={newCust.company_name} onChange={e => setNewCust({ ...newCust, company_name: e.target.value })} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Primary Phone *</label>
               <input type="tel" className="form-input" required value={newCust.phone} onChange={e => setNewCust({ ...newCust, phone: e.target.value })} />
             </div>
             <div className="form-group">
-              <label className="form-label">Email</label>
+              <label className="form-label">Email Address</label>
               <input type="email" className="form-input" value={newCust.email} onChange={e => setNewCust({ ...newCust, email: e.target.value })} />
             </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Address</label>
-            <input type="text" className="form-input" placeholder="Street, City, Postcode" value={newCust.address} onChange={e => setNewCust({ ...newCust, address: e.target.value })} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
+             <div className="form-group">
+              <label className="form-label">Preferred Contact</label>
+              <select className="form-input" value={newCust.preferred_contact} onChange={e => setNewCust({ ...newCust, preferred_contact: e.target.value })}>
+                <option value="phone">Phone Call</option>
+                <option value="sms">SMS / WhatsApp</option>
+                <option value="email">Email</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '1rem', height: '100%' }}>
+              <input type="checkbox" id="fleet" checked={newCust.is_fleet} onChange={e => setNewCust({ ...newCust, is_fleet: e.target.checked })} style={{ accentColor: 'var(--accent-primary)', width: '20px', height: '20px' }} />
+              <label htmlFor="fleet" className="form-label" style={{ marginBottom: 0 }}>Register as Fleet Account</label>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+
+          <div className="form-group" style={{ marginTop: '1rem' }}>
+            <label className="form-label">Address</label>
+            <textarea className="form-input" rows={2} placeholder="Street, City, Postcode" value={newCust.address} onChange={e => setNewCust({ ...newCust, address: e.target.value })} style={{ resize: 'none' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowCustModal(false)}>Cancel</Button>
-            <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Add Customer</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Deploy Client Space</Button>
           </div>
         </form>
       </Modal>
 
-      {/* Add Vehicle Modal */}
-      <Modal isOpen={selectedCustomer && showVehModal} onClose={() => setShowVehModal(false)} title={`Add Vehicle for ${selectedCustomer?.name}`}>
+      <Modal isOpen={selectedCustomer && showVehModal} onClose={() => setShowVehModal(false)} title={`Register Vehicle — ${selectedCustomer?.name}`}>
         <form onSubmit={handleCreateVehicle}>
-          <div className="form-group">
-            <label className="form-label">License Plate *</label>
-            <input type="text" className="form-input" required placeholder="AB12 CDE" value={newVeh.license_plate} onChange={e => setNewVeh({ ...newVeh, license_plate: e.target.value.toUpperCase() })} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="form-group">
+              <label className="form-label">License Plate *</label>
+              <input type="text" className="form-input" required placeholder="AB12 CDE" value={newVeh.license_plate} onChange={e => setNewVeh({ ...newVeh, license_plate: e.target.value.toUpperCase() })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Current Mileage</label>
+              <input type="number" className="form-input" placeholder="45000" value={newVeh.mileage} onChange={e => setNewVeh({ ...newVeh, mileage: e.target.value })} />
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
             <div className="form-group">
               <label className="form-label">Make *</label>
               <input type="text" className="form-input" required placeholder="BMW" value={newVeh.make} onChange={e => setNewVeh({ ...newVeh, make: e.target.value })} />
@@ -228,19 +264,40 @@ export default function CustomersPage() {
               <input type="text" className="form-input" required placeholder="320d" value={newVeh.model} onChange={e => setNewVeh({ ...newVeh, model: e.target.value })} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
             <div className="form-group">
-              <label className="form-label">Year</label>
-              <input type="text" className="form-input" placeholder="2020" value={newVeh.year} onChange={e => setNewVeh({ ...newVeh, year: e.target.value })} />
+              <label className="form-label">Fuel Type</label>
+              <select className="form-input" value={newVeh.fuel_type} onChange={e => setNewVeh({ ...newVeh, fuel_type: e.target.value })}>
+                <option value="Petrol">Petrol</option>
+                <option value="Diesel">Diesel</option>
+                <option value="Electric">Electric (EV)</option>
+                <option value="Hybrid">Hybrid</option>
+              </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Current Mileage</label>
-              <input type="number" className="form-input" placeholder="45000" value={newVeh.mileage} onChange={e => setNewVeh({ ...newVeh, mileage: e.target.value })} />
+              <label className="form-label">Transmission</label>
+              <select className="form-input" value={newVeh.transmission} onChange={e => setNewVeh({ ...newVeh, transmission: e.target.value })}>
+                <option value="Manual">Manual</option>
+                <option value="Automatic">Automatic</option>
+              </select>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">VIN (Last 7)</label>
+              <input type="text" className="form-input" placeholder="WBA..." value={newVeh.vin} onChange={e => setNewVeh({ ...newVeh, vin: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Engine Code</label>
+              <input type="text" className="form-input" placeholder="N57..." value={newVeh.engine_code} onChange={e => setNewVeh({ ...newVeh, engine_code: e.target.value })} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
             <Button variant="secondary" style={{ flex: 1 }} onClick={() => setShowVehModal(false)}>Cancel</Button>
-            <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Register Vehicle</Button>
+            <Button type="submit" style={{ flex: 1 }} isLoading={isSaving}>Link Asset</Button>
           </div>
         </form>
       </Modal>
