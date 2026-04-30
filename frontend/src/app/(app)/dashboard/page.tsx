@@ -1,24 +1,20 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { useUser } from '@/hooks/useUser';
 import { Card, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 
 export default function Dashboard() {
   const { garageId, userName } = useUser();
+  const router = useRouter();
   const [stats, setStats] = useState({ activeJobs: 0, todayBookings: 0, lowStock: 0, revenue: 0, pendingInvoices: 0 });
   const [activities, setActivities] = useState<any[]>([]);
   const [recentJobs, setRecentJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  };
 
   const fetchAll = useCallback(async () => {
     if (!garageId) return;
@@ -37,17 +33,13 @@ export default function Dashboard() {
       supabase.from('bookings').select('id').eq('garage_id', garageId).gte('start_time', todayISO),
     ]);
 
-    const jobs = jobsRes.data || [];
-    const parts = partsRes.data || [];
-    const invoices = invoicesRes.data || [];
-
-    const revenue = invoices.filter(i => i.status === 'paid').reduce((acc, i) => acc + (i.total_amount || 0), 0);
-    const pendingInvoices = invoices.filter(i => i.status !== 'paid').length;
+    const revenue = (invoicesRes.data || []).filter(i => i.status === 'paid').reduce((acc, i) => acc + (i.total_amount || 0), 0);
+    const pendingInvoices = (invoicesRes.data || []).filter(i => i.status !== 'paid').length;
 
     setStats({
-      activeJobs: jobs.filter(j => j.status === 'in_progress').length,
+      activeJobs: (jobsRes.data || []).filter(j => j.status === 'in_progress').length,
       todayBookings: bookingsRes.data?.length || 0,
-      lowStock: parts.filter(p => p.quantity <= (p.min_stock_level || 5)).length,
+      lowStock: (partsRes.data || []).filter(p => p.quantity <= (p.min_stock_level || 5)).length,
       revenue,
       pendingInvoices,
     });
@@ -72,6 +64,28 @@ export default function Dashboard() {
 
   const firstName = userName?.split(' ')[0] || 'Team';
 
+  // ONBOARDING STATE
+  if (!garageId) {
+    return (
+      <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
+        <Card glass style={{ maxWidth: '600px', textAlign: 'center', padding: '4rem 2rem' }}>
+          <div style={{ width: '80px', height: '80px', background: 'var(--accent-gradient)', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 2rem', boxShadow: '0 0 40px var(--accent-glow)' }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: '1rem', letterSpacing: '-0.04em' }}>Welcome to VARR</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem', lineHeight: 1.6, marginBottom: '2.5rem' }}>
+            It looks like your account is active but not yet linked to a workshop. Let's get your digital service center up and running.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <Button size="lg" style={{ width: '100%' }} onClick={() => router.push('/initialize')}>Initialize My Workshop</Button>
+            <Button variant="ghost" style={{ width: '100%' }} onClick={() => window.location.reload()}>Re-sync Connection</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // MAIN DASHBOARD
   return (
     <div className="animate-fade-in" style={{ position: 'relative' }}>
       {/* Background Decor */}
@@ -102,7 +116,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Primary KPI Grid */}
+      {/* KPI Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
         {[
           { label: 'Active Jobs', value: stats.activeJobs, color: 'var(--accent-primary)', link: '/jobs', desc: 'In production' },
@@ -115,7 +129,7 @@ export default function Dashboard() {
               <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.1em', marginBottom: '1rem' }}>{stat.label}</div>
               <div style={{ fontSize: '2.5rem', fontWeight: 900, color: stat.color, letterSpacing: '-0.03em' }}>{loading ? '—' : stat.value}</div>
               <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>{stat.desc}</div>
-              {(stat as any).pulse && (
+              {stat.pulse && (
                 <div style={{ position: 'absolute', top: '1rem', right: '1rem', width: '10px', height: '10px', borderRadius: '50%', background: stat.color, boxShadow: `0 0 15px ${stat.color}`, animation: 'pulse-glow 2s infinite' }}></div>
               )}
             </Card>
@@ -123,10 +137,8 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Operations Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '2rem' }}>
-
-        {/* Real-time Telemetry */}
+        {/* Telemetry */}
         <Card padding="0" className="glass-panel">
           <CardHeader style={{ padding: '1.5rem 1.5rem 0 1.5rem' }}>
             <CardTitle>Operational Telemetry</CardTitle>
@@ -139,7 +151,7 @@ export default function Dashboard() {
               </div>
             ) : (
               activities.map((act, i) => (
-                <div key={act.id} style={{ display: 'flex', gap: '1.25rem', borderLeft: `2px solid ${i === 0 ? 'var(--accent-primary)' : 'var(--border-color)'}`, paddingLeft: '1.5rem', position: 'relative', transition: 'all 0.3s' }}>
+                <div key={act.id} style={{ display: 'flex', gap: '1.25rem', borderLeft: `2px solid ${i === 0 ? 'var(--accent-primary)' : 'var(--border-color)'}`, paddingLeft: '1.5rem', position: 'relative' }}>
                   <div style={{ position: 'absolute', left: '-5px', top: '4px', width: '8px', height: '8px', borderRadius: '50%', background: i === 0 ? 'var(--accent-primary)' : 'var(--text-tertiary)', boxShadow: i === 0 ? '0 0 12px var(--accent-primary)' : 'none' }}></div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: i === 0 ? 'var(--text-primary)' : 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{act.action?.replace(/_/g, ' ')}</div>
@@ -155,72 +167,36 @@ export default function Dashboard() {
         </Card>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Quick Production Actions */}
           <Card className="glass-panel">
             <CardHeader>
               <CardTitle>Quick Directives</CardTitle>
             </CardHeader>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Link href="/jobs" style={{ textDecoration: 'none' }}>
-                <button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /></svg>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>New Job</span>
-                </button>
-              </Link>
-              <Link href="/customers" style={{ textDecoration: 'none' }}>
-                <button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Client+</span>
-                </button>
-              </Link>
-              <Link href="/bookings" style={{ textDecoration: 'none' }}>
-                <button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Schedule</span>
-                </button>
-              </Link>
-              <Link href="/invoices" style={{ textDecoration: 'none' }}>
-                <button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Invoice</span>
-                </button>
-              </Link>
+              <Link href="/jobs" style={{ textDecoration: 'none' }}><button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /></svg><span style={{ fontSize: '0.75rem', fontWeight: 700 }}>New Job</span></button></Link>
+              <Link href="/customers" style={{ textDecoration: 'none' }}><button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg><span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Client+</span></button></Link>
+              <Link href="/bookings" style={{ textDecoration: 'none' }}><button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg><span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Schedule</span></button></Link>
+              <Link href="/invoices" style={{ textDecoration: 'none' }}><button className="btn btn-secondary" style={{ width: '100%', flexDirection: 'column', height: '100px', justifyContent: 'center', gap: '0.5rem' }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg><span style={{ fontSize: '0.75rem', fontWeight: 700 }}>Invoice</span></button></Link>
             </div>
           </Card>
 
-          {/* High Priority Alerts */}
-          {stats.lowStock > 0 && (
-            <Card style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                <div style={{ width: '40px', height: '40px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger)' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Supply Chain Alert</div>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                    {stats.lowStock} inventory items have fallen below critical stock thresholds.
-                  </p>
-                  <Link href="/parts" style={{ display: 'inline-block', marginTop: '0.75rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--danger)', textDecoration: 'none' }}>REPLENISH STOCK →</Link>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Recent Performance Snapshot */}
           <Card className="glass-panel">
             <CardHeader>
               <CardTitle>Production Snap</CardTitle>
             </CardHeader>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {recentJobs.slice(0, 3).map(job => (
-                <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ overflow: 'hidden' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.8125rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{job.vehicles?.make} {job.vehicles?.model}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{new Date(job.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} update</div>
+              {recentJobs.length === 0 ? (
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)', textAlign: 'center', padding: '1rem' }}>No recent activity.</p>
+              ) : (
+                recentJobs.slice(0, 3).map(job => (
+                  <div key={job.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ overflow: 'hidden' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.8125rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{job.vehicles?.make} {job.vehicles?.model}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{new Date(job.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} update</div>
+                    </div>
+                    <span className={`status-badge status-${job.status}`} style={{ fontSize: '0.6rem', padding: '2px 8px' }}>{job.status?.replace('_', ' ')}</span>
                   </div>
-                  <span className={`status-badge status-${job.status}`} style={{ fontSize: '0.6rem', padding: '2px 8px' }}>{job.status?.replace('_', ' ')}</span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
         </div>
